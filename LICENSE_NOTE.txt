@@ -1,0 +1,2 @@
+Proposed licensing (to be confirmed by the author before deposit): code under the MIT License; run records, checkpoints,
+logs and tables under CC BY 4.0. Replace this note with the chosen licence texts at deposit.

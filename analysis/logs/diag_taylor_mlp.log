@@ -1,0 +1,18 @@
+/Users/ucla/Downloads/QPINN_LaserThermoelastic_cc_pro_2026-10-20/analysis/qpinn_local.py:161: UserWarning: Converting a tensor with requires_grad=True to a scalar may lead to unexpected behavior.
+Consider using tensor.detach() first. (Triggered internally at /Users/runner/work/pytorch/pytorch/pytorch/torch/csrc/autograd/generated/python_variable_methods.cpp:837.)
+  return weights[0] * lp + weights[1] * lb, dict(pde=lp.item(), bc=lb.item(), ic=float(li))
+  it   500 loss 2.672e-01 val 2.1997 {'pde': 0.019847021113778607, 'bc': 0.24739974123999633, 'ic': 0.18603545470439106}  (2s)
+  it  1000 loss 1.297e-01 val 1.6664 {'pde': 0.012123348734824752, 'bc': 0.11753364371260741, 'ic': 0.09275702117720229}  (5s)
+  it  1500 loss 7.750e-02 val 1.0826 {'pde': 0.009017761869715642, 'bc': 0.06847882080955878, 'ic': 0.050953976920851504}  (7s)
+  it  2000 loss 6.248e-02 val 0.8751 {'pde': 0.006642074213348686, 'bc': 0.055836218125016115, 'ic': 0.038224396093219495}  (10s)
+  it  2500 loss 5.092e-02 val 0.8111 {'pde': 0.006215216127511169, 'bc': 0.04470933338773253, 'ic': 0.029433196513095967}  (12s)
+  it  3000 loss 4.825e-02 val 0.8057 {'pde': 0.006586913365599937, 'bc': 0.04166329090913716, 'ic': 0.02951713159998968}  (14s)
+  it  3500 loss 5.174e-02 val 0.7936 {'pde': 0.006859092954659864, 'bc': 0.0448786594737999, 'ic': 0.027895040795413023}  (17s)
+  it  4000 loss 4.807e-02 val 0.7778 {'pde': 0.007121063795806173, 'bc': 0.04095227949428517, 'ic': 0.0270774130101434}  (19s)
+  lbfgs 2077 evals  val 0.4293  (45s)
+icrate mlp (114 params): relL2 T 0.1533 sigma 0.2876 (46s)
+   near front |x-3t|<0.3    sigma relL2 0.095   T relL2 0.176
+   ahead                    sigma relL2 0.147   T relL2 0.287
+   behind                   sigma relL2 0.565   T relL2 0.150
+   early t<0.5              sigma relL2 0.190   T relL2 0.235
+   x<1                      sigma relL2 0.392   T relL2 0.128

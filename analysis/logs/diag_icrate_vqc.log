@@ -1,0 +1,4 @@
+/Users/ucla/Downloads/QPINN_LaserThermoelastic_cc_pro_2026-10-20/analysis/qpinn_local.py:161: UserWarning: Converting a tensor with requires_grad=True to a scalar may lead to unexpected behavior.
+Consider using tensor.detach() first. (Triggered internally at /Users/runner/work/pytorch/pytorch/pytorch/torch/csrc/autograd/generated/python_variable_methods.cpp:837.)
+  return weights[0] * lp + weights[1] * lb, dict(pde=lp.item(), bc=lb.item(), ic=float(li))
+  it   500 loss 2.562e-01 val 2.2285 {'pde': 0.03256413004332738, 'bc': 0.22367254582723742, 'ic': 0.19660236841252263}  (412s)

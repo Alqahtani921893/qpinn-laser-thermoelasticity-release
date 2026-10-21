@@ -1,0 +1,18 @@
+data (3000 its, 15s): global relL2 T 0.0284 sigma 0.0439
+   early t<0.5              sigma relL2 0.103  (share of ||sigma||^2: 0.144)   T relL2 0.087
+   mid 0.5<t<1.5            sigma relL2 0.021  (share of ||sigma||^2: 0.513)   T relL2 0.022
+   late t>1.5               sigma relL2 0.022  (share of ||sigma||^2: 0.343)   T relL2 0.019
+   ahead x>3t+0.3           sigma relL2 0.025  (share of ||sigma||^2: 0.345)   T relL2 0.100
+   near front |x-3t|<0.3    sigma relL2 0.058  (share of ||sigma||^2: 0.430)   T relL2 0.101
+   behind x<3t-0.3          sigma relL2 0.034  (share of ||sigma||^2: 0.223)   T relL2 0.022
+   x<1                      sigma relL2 0.167  (share of ||sigma||^2: 0.052)   T relL2 0.026
+   x>4                      sigma relL2 0.023  (share of ||sigma||^2: 0.395)   T relL2 0.136
+physics (4000 its, 223s): global relL2 T 0.0344 sigma 0.2577
+   early t<0.5              sigma relL2 0.423  (share of ||sigma||^2: 0.144)   T relL2 0.036
+   mid 0.5<t<1.5            sigma relL2 0.255  (share of ||sigma||^2: 0.513)   T relL2 0.041
+   late t>1.5               sigma relL2 0.144  (share of ||sigma||^2: 0.343)   T relL2 0.030
+   ahead x>3t+0.3           sigma relL2 0.240  (share of ||sigma||^2: 0.345)   T relL2 0.171
+   near front |x-3t|<0.3    sigma relL2 0.249  (share of ||sigma||^2: 0.430)   T relL2 0.062
+   behind x<3t-0.3          sigma relL2 0.296  (share of ||sigma||^2: 0.223)   T relL2 0.028
+   x<1                      sigma relL2 0.532  (share of ||sigma||^2: 0.052)   T relL2 0.023
+   x>4                      sigma relL2 0.148  (share of ||sigma||^2: 0.395)   T relL2 0.232

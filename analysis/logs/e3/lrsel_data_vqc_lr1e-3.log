@@ -1,0 +1,4 @@
+== run vqc_exp_g9_data_q6L4_s100_datalr1e-3 params 124
+  it   500 loss 5.384e-02 val 1.4753 {'data': 0.053844765305916115}  (12s)
+  it  1000 loss 4.390e-02 val 1.2484 {'data': 0.04390063728692284}  (23s)
+   -> relL2 T 0.6237 sigma 0.6368 (24s)

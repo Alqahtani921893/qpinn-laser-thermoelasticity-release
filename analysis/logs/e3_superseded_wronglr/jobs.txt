@@ -1,0 +1,68 @@
+python3 qpinn_local.py run --model vqc --case exp --gamma 9 --n_q 4 --L 2 --seed 0 --iters 2000 --lbfgs 1000 --n_c 512 --lr 5e-3 --tag pareto --out results/e3 > logs/e3/pareto_vqc_q4L2_s0.log 2>&1
+python3 qpinn_local.py run --model mlp --case exp --gamma 9 --n_q 4 --L 2 --seed 0 --iters 2000 --lbfgs 1000 --n_c 512 --lr 3e-3 --tag pareto --out results/e3 > logs/e3/pareto_mlp_q4L2_s0.log 2>&1
+python3 qpinn_local.py run --model ff --case exp --gamma 9 --n_q 4 --L 2 --seed 0 --iters 2000 --lbfgs 1000 --n_c 512 --lr 3e-3 --tag pareto --out results/e3 > logs/e3/pareto_ff_q4L2_s0.log 2>&1
+python3 qpinn_local.py run --model vqc --case exp --gamma 9 --n_q 4 --L 4 --seed 0 --iters 2000 --lbfgs 1000 --n_c 512 --lr 5e-3 --tag pareto --out results/e3 > logs/e3/pareto_vqc_q4L4_s0.log 2>&1
+python3 qpinn_local.py run --model mlp --case exp --gamma 9 --n_q 4 --L 4 --seed 0 --iters 2000 --lbfgs 1000 --n_c 512 --lr 3e-3 --tag pareto --out results/e3 > logs/e3/pareto_mlp_q4L4_s0.log 2>&1
+python3 qpinn_local.py run --model ff --case exp --gamma 9 --n_q 4 --L 4 --seed 0 --iters 2000 --lbfgs 1000 --n_c 512 --lr 3e-3 --tag pareto --out results/e3 > logs/e3/pareto_ff_q4L4_s0.log 2>&1
+python3 qpinn_local.py run --model vqc --case exp --gamma 9 --n_q 6 --L 2 --seed 0 --iters 2000 --lbfgs 1000 --n_c 512 --lr 5e-3 --tag pareto --out results/e3 > logs/e3/pareto_vqc_q6L2_s0.log 2>&1
+python3 qpinn_local.py run --model mlp --case exp --gamma 9 --n_q 6 --L 2 --seed 0 --iters 2000 --lbfgs 1000 --n_c 512 --lr 3e-3 --tag pareto --out results/e3 > logs/e3/pareto_mlp_q6L2_s0.log 2>&1
+python3 qpinn_local.py run --model ff --case exp --gamma 9 --n_q 6 --L 2 --seed 0 --iters 2000 --lbfgs 1000 --n_c 512 --lr 3e-3 --tag pareto --out results/e3 > logs/e3/pareto_ff_q6L2_s0.log 2>&1
+python3 qpinn_local.py run --model vqc --case exp --gamma 9 --n_q 6 --L 4 --seed 0 --iters 2000 --lbfgs 1000 --n_c 512 --lr 5e-3 --tag pareto --out results/e3 > logs/e3/pareto_vqc_q6L4_s0.log 2>&1
+python3 qpinn_local.py run --model mlp --case exp --gamma 9 --n_q 6 --L 4 --seed 0 --iters 2000 --lbfgs 1000 --n_c 512 --lr 3e-3 --tag pareto --out results/e3 > logs/e3/pareto_mlp_q6L4_s0.log 2>&1
+python3 qpinn_local.py run --model ff --case exp --gamma 9 --n_q 6 --L 4 --seed 0 --iters 2000 --lbfgs 1000 --n_c 512 --lr 3e-3 --tag pareto --out results/e3 > logs/e3/pareto_ff_q6L4_s0.log 2>&1
+python3 qpinn_local.py run --model vqc --case exp --gamma 9 --n_q 6 --L 8 --seed 0 --iters 2000 --lbfgs 1000 --n_c 512 --lr 5e-3 --tag pareto --out results/e3 > logs/e3/pareto_vqc_q6L8_s0.log 2>&1
+python3 qpinn_local.py run --model mlp --case exp --gamma 9 --n_q 6 --L 8 --seed 0 --iters 2000 --lbfgs 1000 --n_c 512 --lr 3e-3 --tag pareto --out results/e3 > logs/e3/pareto_mlp_q6L8_s0.log 2>&1
+python3 qpinn_local.py run --model ff --case exp --gamma 9 --n_q 6 --L 8 --seed 0 --iters 2000 --lbfgs 1000 --n_c 512 --lr 3e-3 --tag pareto --out results/e3 > logs/e3/pareto_ff_q6L8_s0.log 2>&1
+python3 qpinn_local.py run --model vqc --case exp --gamma 9 --n_q 8 --L 2 --seed 0 --iters 2000 --lbfgs 1000 --n_c 512 --lr 5e-3 --tag pareto --out results/e3 > logs/e3/pareto_vqc_q8L2_s0.log 2>&1
+python3 qpinn_local.py run --model mlp --case exp --gamma 9 --n_q 8 --L 2 --seed 0 --iters 2000 --lbfgs 1000 --n_c 512 --lr 3e-3 --tag pareto --out results/e3 > logs/e3/pareto_mlp_q8L2_s0.log 2>&1
+python3 qpinn_local.py run --model ff --case exp --gamma 9 --n_q 8 --L 2 --seed 0 --iters 2000 --lbfgs 1000 --n_c 512 --lr 3e-3 --tag pareto --out results/e3 > logs/e3/pareto_ff_q8L2_s0.log 2>&1
+python3 qpinn_local.py run --model vqc --case exp --gamma 9 --n_q 6 --L 4 --seed 0 --iters 2000 --lbfgs 1000 --n_c 64 --lr 5e-3 --tag nc64 --out results/e3 > logs/e3/nc64_vqc_s0.log 2>&1
+python3 qpinn_local.py run --model mlp --case exp --gamma 9 --n_q 6 --L 4 --seed 0 --iters 2000 --lbfgs 1000 --n_c 64 --lr 3e-3 --tag nc64 --out results/e3 > logs/e3/nc64_mlp_s0.log 2>&1
+python3 qpinn_local.py run --model vqc --case exp --gamma 9 --n_q 6 --L 4 --seed 0 --iters 2000 --lbfgs 1000 --n_c 256 --lr 5e-3 --tag nc256 --out results/e3 > logs/e3/nc256_vqc_s0.log 2>&1
+python3 qpinn_local.py run --model mlp --case exp --gamma 9 --n_q 6 --L 4 --seed 0 --iters 2000 --lbfgs 1000 --n_c 256 --lr 3e-3 --tag nc256 --out results/e3 > logs/e3/nc256_mlp_s0.log 2>&1
+python3 qpinn_local.py run --model vqc --case exp --gamma 9 --n_q 6 --L 4 --seed 0 --iters 2000 --lbfgs 1000 --n_c 1024 --lr 5e-3 --tag nc1024 --out results/e3 > logs/e3/nc1024_vqc_s0.log 2>&1
+python3 qpinn_local.py run --model mlp --case exp --gamma 9 --n_q 6 --L 4 --seed 0 --iters 2000 --lbfgs 1000 --n_c 1024 --lr 3e-3 --tag nc1024 --out results/e3 > logs/e3/nc1024_mlp_s0.log 2>&1
+python3 qpinn_local.py run --model vqc --case exp --gamma 9 --n_q 6 --L 4 --seed 0 --iters 2000 --lbfgs 1000 --n_c 4096 --lr 5e-3 --tag nc4096 --out results/e3 > logs/e3/nc4096_vqc_s0.log 2>&1
+python3 qpinn_local.py run --model mlp --case exp --gamma 9 --n_q 6 --L 4 --seed 0 --iters 2000 --lbfgs 1000 --n_c 4096 --lr 3e-3 --tag nc4096 --out results/e3 > logs/e3/nc4096_mlp_s0.log 2>&1
+python3 qpinn_local.py run --model vqc --case exp --gamma 9 --n_q 6 --L 4 --seed 0 --iters 2000 --lbfgs 0 --n_d 16 --regime data --lr 5e-3 --tag nd16 --out results/e3 > logs/e3/nd16_vqc_s0.log 2>&1
+python3 qpinn_local.py run --model mlp --case exp --gamma 9 --n_q 6 --L 4 --seed 0 --iters 2000 --lbfgs 0 --n_d 16 --regime data --lr 3e-3 --tag nd16 --out results/e3 > logs/e3/nd16_mlp_s0.log 2>&1
+python3 qpinn_local.py run --model vqc --case exp --gamma 9 --n_q 6 --L 4 --seed 0 --iters 2000 --lbfgs 0 --n_d 64 --regime data --lr 5e-3 --tag nd64 --out results/e3 > logs/e3/nd64_vqc_s0.log 2>&1
+python3 qpinn_local.py run --model mlp --case exp --gamma 9 --n_q 6 --L 4 --seed 0 --iters 2000 --lbfgs 0 --n_d 64 --regime data --lr 3e-3 --tag nd64 --out results/e3 > logs/e3/nd64_mlp_s0.log 2>&1
+python3 qpinn_local.py run --model vqc --case exp --gamma 9 --n_q 6 --L 4 --seed 0 --iters 2000 --lbfgs 0 --n_d 256 --regime data --lr 5e-3 --tag nd256 --out results/e3 > logs/e3/nd256_vqc_s0.log 2>&1
+python3 qpinn_local.py run --model mlp --case exp --gamma 9 --n_q 6 --L 4 --seed 0 --iters 2000 --lbfgs 0 --n_d 256 --regime data --lr 3e-3 --tag nd256 --out results/e3 > logs/e3/nd256_mlp_s0.log 2>&1
+python3 qpinn_local.py run --model vqc --case exp --gamma 9 --n_q 6 --L 4 --seed 0 --iters 2000 --lbfgs 0 --n_d 1024 --regime data --lr 5e-3 --tag nd1024 --out results/e3 > logs/e3/nd1024_vqc_s0.log 2>&1
+python3 qpinn_local.py run --model mlp --case exp --gamma 9 --n_q 6 --L 4 --seed 0 --iters 2000 --lbfgs 0 --n_d 1024 --regime data --lr 3e-3 --tag nd1024 --out results/e3 > logs/e3/nd1024_mlp_s0.log 2>&1
+python3 qpinn_local.py run --model vqc --case exp --gamma 9 --n_q 4 --L 2 --seed 1 --iters 2000 --lbfgs 1000 --n_c 512 --lr 5e-3 --tag pareto --out results/e3 > logs/e3/pareto_vqc_q4L2_s1.log 2>&1
+python3 qpinn_local.py run --model mlp --case exp --gamma 9 --n_q 4 --L 2 --seed 1 --iters 2000 --lbfgs 1000 --n_c 512 --lr 3e-3 --tag pareto --out results/e3 > logs/e3/pareto_mlp_q4L2_s1.log 2>&1
+python3 qpinn_local.py run --model ff --case exp --gamma 9 --n_q 4 --L 2 --seed 1 --iters 2000 --lbfgs 1000 --n_c 512 --lr 3e-3 --tag pareto --out results/e3 > logs/e3/pareto_ff_q4L2_s1.log 2>&1
+python3 qpinn_local.py run --model vqc --case exp --gamma 9 --n_q 4 --L 4 --seed 1 --iters 2000 --lbfgs 1000 --n_c 512 --lr 5e-3 --tag pareto --out results/e3 > logs/e3/pareto_vqc_q4L4_s1.log 2>&1
+python3 qpinn_local.py run --model mlp --case exp --gamma 9 --n_q 4 --L 4 --seed 1 --iters 2000 --lbfgs 1000 --n_c 512 --lr 3e-3 --tag pareto --out results/e3 > logs/e3/pareto_mlp_q4L4_s1.log 2>&1
+python3 qpinn_local.py run --model ff --case exp --gamma 9 --n_q 4 --L 4 --seed 1 --iters 2000 --lbfgs 1000 --n_c 512 --lr 3e-3 --tag pareto --out results/e3 > logs/e3/pareto_ff_q4L4_s1.log 2>&1
+python3 qpinn_local.py run --model vqc --case exp --gamma 9 --n_q 6 --L 2 --seed 1 --iters 2000 --lbfgs 1000 --n_c 512 --lr 5e-3 --tag pareto --out results/e3 > logs/e3/pareto_vqc_q6L2_s1.log 2>&1
+python3 qpinn_local.py run --model mlp --case exp --gamma 9 --n_q 6 --L 2 --seed 1 --iters 2000 --lbfgs 1000 --n_c 512 --lr 3e-3 --tag pareto --out results/e3 > logs/e3/pareto_mlp_q6L2_s1.log 2>&1
+python3 qpinn_local.py run --model ff --case exp --gamma 9 --n_q 6 --L 2 --seed 1 --iters 2000 --lbfgs 1000 --n_c 512 --lr 3e-3 --tag pareto --out results/e3 > logs/e3/pareto_ff_q6L2_s1.log 2>&1
+python3 qpinn_local.py run --model vqc --case exp --gamma 9 --n_q 6 --L 4 --seed 1 --iters 2000 --lbfgs 1000 --n_c 512 --lr 5e-3 --tag pareto --out results/e3 > logs/e3/pareto_vqc_q6L4_s1.log 2>&1
+python3 qpinn_local.py run --model mlp --case exp --gamma 9 --n_q 6 --L 4 --seed 1 --iters 2000 --lbfgs 1000 --n_c 512 --lr 3e-3 --tag pareto --out results/e3 > logs/e3/pareto_mlp_q6L4_s1.log 2>&1
+python3 qpinn_local.py run --model ff --case exp --gamma 9 --n_q 6 --L 4 --seed 1 --iters 2000 --lbfgs 1000 --n_c 512 --lr 3e-3 --tag pareto --out results/e3 > logs/e3/pareto_ff_q6L4_s1.log 2>&1
+python3 qpinn_local.py run --model vqc --case exp --gamma 9 --n_q 6 --L 8 --seed 1 --iters 2000 --lbfgs 1000 --n_c 512 --lr 5e-3 --tag pareto --out results/e3 > logs/e3/pareto_vqc_q6L8_s1.log 2>&1
+python3 qpinn_local.py run --model mlp --case exp --gamma 9 --n_q 6 --L 8 --seed 1 --iters 2000 --lbfgs 1000 --n_c 512 --lr 3e-3 --tag pareto --out results/e3 > logs/e3/pareto_mlp_q6L8_s1.log 2>&1
+python3 qpinn_local.py run --model ff --case exp --gamma 9 --n_q 6 --L 8 --seed 1 --iters 2000 --lbfgs 1000 --n_c 512 --lr 3e-3 --tag pareto --out results/e3 > logs/e3/pareto_ff_q6L8_s1.log 2>&1
+python3 qpinn_local.py run --model vqc --case exp --gamma 9 --n_q 8 --L 2 --seed 1 --iters 2000 --lbfgs 1000 --n_c 512 --lr 5e-3 --tag pareto --out results/e3 > logs/e3/pareto_vqc_q8L2_s1.log 2>&1
+python3 qpinn_local.py run --model mlp --case exp --gamma 9 --n_q 8 --L 2 --seed 1 --iters 2000 --lbfgs 1000 --n_c 512 --lr 3e-3 --tag pareto --out results/e3 > logs/e3/pareto_mlp_q8L2_s1.log 2>&1
+python3 qpinn_local.py run --model ff --case exp --gamma 9 --n_q 8 --L 2 --seed 1 --iters 2000 --lbfgs 1000 --n_c 512 --lr 3e-3 --tag pareto --out results/e3 > logs/e3/pareto_ff_q8L2_s1.log 2>&1
+python3 qpinn_local.py run --model vqc --case exp --gamma 9 --n_q 6 --L 4 --seed 1 --iters 2000 --lbfgs 1000 --n_c 64 --lr 5e-3 --tag nc64 --out results/e3 > logs/e3/nc64_vqc_s1.log 2>&1
+python3 qpinn_local.py run --model mlp --case exp --gamma 9 --n_q 6 --L 4 --seed 1 --iters 2000 --lbfgs 1000 --n_c 64 --lr 3e-3 --tag nc64 --out results/e3 > logs/e3/nc64_mlp_s1.log 2>&1
+python3 qpinn_local.py run --model vqc --case exp --gamma 9 --n_q 6 --L 4 --seed 1 --iters 2000 --lbfgs 1000 --n_c 256 --lr 5e-3 --tag nc256 --out results/e3 > logs/e3/nc256_vqc_s1.log 2>&1
+python3 qpinn_local.py run --model mlp --case exp --gamma 9 --n_q 6 --L 4 --seed 1 --iters 2000 --lbfgs 1000 --n_c 256 --lr 3e-3 --tag nc256 --out results/e3 > logs/e3/nc256_mlp_s1.log 2>&1
+python3 qpinn_local.py run --model vqc --case exp --gamma 9 --n_q 6 --L 4 --seed 1 --iters 2000 --lbfgs 1000 --n_c 1024 --lr 5e-3 --tag nc1024 --out results/e3 > logs/e3/nc1024_vqc_s1.log 2>&1
+python3 qpinn_local.py run --model mlp --case exp --gamma 9 --n_q 6 --L 4 --seed 1 --iters 2000 --lbfgs 1000 --n_c 1024 --lr 3e-3 --tag nc1024 --out results/e3 > logs/e3/nc1024_mlp_s1.log 2>&1
+python3 qpinn_local.py run --model vqc --case exp --gamma 9 --n_q 6 --L 4 --seed 1 --iters 2000 --lbfgs 1000 --n_c 4096 --lr 5e-3 --tag nc4096 --out results/e3 > logs/e3/nc4096_vqc_s1.log 2>&1
+python3 qpinn_local.py run --model mlp --case exp --gamma 9 --n_q 6 --L 4 --seed 1 --iters 2000 --lbfgs 1000 --n_c 4096 --lr 3e-3 --tag nc4096 --out results/e3 > logs/e3/nc4096_mlp_s1.log 2>&1
+python3 qpinn_local.py run --model vqc --case exp --gamma 9 --n_q 6 --L 4 --seed 1 --iters 2000 --lbfgs 0 --n_d 16 --regime data --lr 5e-3 --tag nd16 --out results/e3 > logs/e3/nd16_vqc_s1.log 2>&1
+python3 qpinn_local.py run --model mlp --case exp --gamma 9 --n_q 6 --L 4 --seed 1 --iters 2000 --lbfgs 0 --n_d 16 --regime data --lr 3e-3 --tag nd16 --out results/e3 > logs/e3/nd16_mlp_s1.log 2>&1
+python3 qpinn_local.py run --model vqc --case exp --gamma 9 --n_q 6 --L 4 --seed 1 --iters 2000 --lbfgs 0 --n_d 64 --regime data --lr 5e-3 --tag nd64 --out results/e3 > logs/e3/nd64_vqc_s1.log 2>&1
+python3 qpinn_local.py run --model mlp --case exp --gamma 9 --n_q 6 --L 4 --seed 1 --iters 2000 --lbfgs 0 --n_d 64 --regime data --lr 3e-3 --tag nd64 --out results/e3 > logs/e3/nd64_mlp_s1.log 2>&1
+python3 qpinn_local.py run --model vqc --case exp --gamma 9 --n_q 6 --L 4 --seed 1 --iters 2000 --lbfgs 0 --n_d 256 --regime data --lr 5e-3 --tag nd256 --out results/e3 > logs/e3/nd256_vqc_s1.log 2>&1
+python3 qpinn_local.py run --model mlp --case exp --gamma 9 --n_q 6 --L 4 --seed 1 --iters 2000 --lbfgs 0 --n_d 256 --regime data --lr 3e-3 --tag nd256 --out results/e3 > logs/e3/nd256_mlp_s1.log 2>&1
+python3 qpinn_local.py run --model vqc --case exp --gamma 9 --n_q 6 --L 4 --seed 1 --iters 2000 --lbfgs 0 --n_d 1024 --regime data --lr 5e-3 --tag nd1024 --out results/e3 > logs/e3/nd1024_vqc_s1.log 2>&1
+python3 qpinn_local.py run --model mlp --case exp --gamma 9 --n_q 6 --L 4 --seed 1 --iters 2000 --lbfgs 0 --n_d 1024 --regime data --lr 3e-3 --tag nd1024 --out results/e3 > logs/e3/nd1024_mlp_s1.log 2>&1

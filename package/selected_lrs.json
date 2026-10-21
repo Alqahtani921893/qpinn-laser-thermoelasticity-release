@@ -1,0 +1,23 @@
+{
+ "exp|ff|4|2": 0.1,
+ "exp|ff|6|4": 0.1,
+ "exp|mlp|4|2": 0.1,
+ "exp|mlp|6|4": 0.1,
+ "exp|mlpref|6|4": 0.01,
+ "exp|vqc|4|2": 0.1,
+ "exp|vqc|6|4": 0.1,
+ "smooth|ff|4|2": 0.1,
+ "smooth|ff|6|4": 0.01,
+ "smooth|mlp|4|2": 0.001,
+ "smooth|mlp|6|4": 0.1,
+ "smooth|mlpref|6|4": 0.01,
+ "smooth|vqc|4|2": 0.1,
+ "smooth|vqc|6|4": 0.01,
+ "step|ff|4|2": 0.1,
+ "step|ff|6|4": 0.03,
+ "step|mlp|4|2": 0.1,
+ "step|mlp|6|4": 0.03,
+ "step|mlpref|6|4": 0.01,
+ "step|vqc|4|2": 0.03,
+ "step|vqc|6|4": 0.03
+}

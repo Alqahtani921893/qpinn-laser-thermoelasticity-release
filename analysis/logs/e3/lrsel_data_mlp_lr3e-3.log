@@ -1,0 +1,4 @@
+== run mlp_exp_g9_data_q6L4_s100_datalr3e-3 params 114
+  it   500 loss 5.862e-02 val 0.9903 {'data': 0.05862046554018022}  (0s)
+  it  1000 loss 5.033e-02 val 0.9734 {'data': 0.05033033956682287}  (0s)
+   -> relL2 T 0.3291 sigma 0.6612 (0s)

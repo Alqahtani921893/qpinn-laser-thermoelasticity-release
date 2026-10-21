@@ -1,0 +1,5 @@
+family equivalence test: 64 random inputs (x in [0,6], t in [0,3]); float64/complex128 statevector
+L=2: 4-qubit parameters transplanted onto qubits (0,1,2,5) of the 6-qubit circuit: max |output difference| = 5.55e-16 (identical function family)
+L=2: 4-qubit parameters transplanted onto qubits (0,1,2,7) of the 8-qubit circuit: max |output difference| = 8.88e-16 (identical function family)
+L=4: 4-qubit parameters transplanted onto qubits (0,1,2,5) of the 6-qubit circuit: max |output difference| = 8.11e-01 (different: control)
+L=4: 4-qubit parameters transplanted onto qubits (0,1,2,7) of the 8-qubit circuit: max |output difference| = 8.48e-01 (different: control)

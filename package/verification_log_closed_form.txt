@@ -1,0 +1,82 @@
+=== corrected closed form vs inverse Laplace (dehoog) and FD, exponential pulse (beta=2, gamma=9) ===
+FD N=2400: 36.9s
+t=0.1   x=0.1  | T: closed=0.07149377  lap=0.07149377  fd=0.07149639  | sig: closed=-0.1601574  lap=-0.1601574  fd=-0.1607108 
+t=0.1   x=0.5  | T: closed=0.05593461  lap=0.05593461  fd=0.0559348   | sig: closed=-0.5068429  lap=-0.5068429  fd=-0.5068445 
+t=0.1   x=1.1  | T: closed=0.03174827  lap=0.03174827  fd=0.03174824  | sig: closed=-0.2901     lap=-0.2901     fd=-0.2900998 
+t=0.1   x=2.1  | T: closed=0.01169214  lap=0.01169214  fd=0.01169215  | sig: closed=-0.1068509  lap=-0.1068509  fd=-0.1068509 
+t=0.1   x=4.1  | T: closed=0.00158236  lap=0.00158236  fd=0.001582361 | sig: closed=-0.0144607  lap=-0.0144607  fd=-0.0144607 
+t=0.3   x=0.1  | T: closed=0.1535613   lap=0.1535613   fd=0.1535655   | sig: closed=-0.03516499 lap=-0.03516499 fd=-0.03513453
+t=0.3   x=0.5  | T: closed=0.1316489   lap=0.1316489   fd=0.1316504   | sig: closed=-0.3154593  lap=-0.3154593  fd=-0.3161421 
+t=0.3   x=1.1  | T: closed=0.08442478  lap=0.08442478  fd=0.08442481  | sig: closed=-0.8394758  lap=-0.8394758  fd=-0.8394726 
+t=0.3   x=2.1  | T: closed=0.03262777  lap=0.03262777  fd=0.03262778  | sig: closed=-0.3369657  lap=-0.3369657  fd=-0.336966  
+t=0.3   x=4.1  | T: closed=0.004425165 lap=0.004425165 fd=0.004425171 | sig: closed=-0.04572803 lap=-0.04572803 fd=-0.04572814
+t=0.75  x=0.1  | T: closed=0.2138984   lap=0.2138984   fd=0.2139026   | sig: closed=0.03057517  lap=0.03057517  fd=0.03059786 
+t=0.75  x=0.5  | T: closed=0.1960946   lap=0.1960946   fd=0.1960972   | sig: closed=0.1203501   lap=0.1203501   fd=0.1203727  
+t=0.75  x=1.1  | T: closed=0.1472632   lap=0.1472632   fd=0.1472642   | sig: closed=0.1097901   lap=0.1097901   fd=0.1097763  
+t=0.75  x=2.1  | T: closed=0.07008054  lap=0.07008054  fd=0.07008056  | sig: closed=-0.7143077  lap=-0.7143077  fd=-0.7204843 
+t=0.75  x=4.1  | T: closed=0.01044091  lap=0.01044091  fd=0.01044094  | sig: closed=-0.201634   lap=-0.201634   fd=-0.2016354 
+t=1.5   x=0.1  | T: closed=0.2042077   lap=0.2042077   fd=0.2042107   | sig: closed=0.01662767  lap=0.01662767  fd=0.01662284 
+t=1.5   x=0.5  | T: closed=0.195007    lap=0.195007    fd=0.1950095   | sig: closed=0.08181417  lap=0.08181417  fd=0.08177081 
+t=1.5   x=1.1  | T: closed=0.1650765   lap=0.1650765   fd=0.1650781   | sig: closed=0.1738573   lap=0.1738573   fd=0.1739481  
+t=1.5   x=2.1  | T: closed=0.1014413   lap=0.1014413   fd=0.1014418   | sig: closed=0.2861162   lap=0.2861162   fd=0.2858752  
+t=1.5   x=4.1  | T: closed=0.0220324   lap=0.0220324   fd=0.02203244  | sig: closed=-0.3568794  lap=-0.3568794  fd=-0.3537156 
+t=2.5   x=0.1  | T: closed=0.1693125   lap=0.1693125   fd=0.1693145   | sig: closed=0.003399979 lap=0.003399979 fd=0.003402662
+t=2.5   x=0.5  | T: closed=0.1650668   lap=0.1650668   fd=0.1650688   | sig: closed=0.01837664  lap=0.01837664  fd=0.01836416 
+t=2.5   x=1.1  | T: closed=0.1496745   lap=0.1496745   fd=0.149676    | sig: closed=0.04506808  lap=0.04506808  fd=0.04505026 
+t=2.5   x=2.1  | T: closed=0.1098703   lap=0.1098703   fd=0.1098711   | sig: closed=0.0986716   lap=0.0986716   fd=0.09858109 
+t=2.5   x=4.1  | T: closed=0.03697105  lap=0.03697105  fd=0.03697115  | sig: closed=0.2316006   lap=0.2316006   fd=0.231626   
+max |closed - FD|: T 4.20e-06  sigma 6.18e-03
+
+=== step pulse (As=1, Delta=0.5, gamma=9) ===
+t=0.1   x=0.1  | T: closed=0.07917933  lap=0.07917933  fd=0.07918224  | sig: closed=-0.1951385  lap=-0.1951385  fd=-0.1956931 
+t=0.1   x=0.5  | T: closed=0.06171725  lap=0.06171725  fd=0.06171744  | sig: closed=-0.5591236  lap=-0.5591236  fd=-0.5591253 
+t=0.1   x=1.1  | T: closed=0.03497314  lap=0.03497314  fd=0.03497311  | sig: closed=-0.319344   lap=-0.319344   fd=-0.3193437 
+t=0.1   x=2.1  | T: closed=0.01287885  lap=0.01287885  fd=0.01287886  | sig: closed=-0.1176126  lap=-0.1176126  fd=-0.1176127 
+t=0.1   x=4.1  | T: closed=0.001742963 lap=0.001742963 fd=0.001742964 | sig: closed=-0.01591714 lap=-0.01591714 fd=-0.01591714
+t=0.3   x=0.1  | T: closed=0.208178    lap=0.208178    fd=0.2081839   | sig: closed=-0.1053514  lap=-0.1053514  fd=-0.1053219 
+t=0.3   x=0.5  | T: closed=0.1764151   lap=0.1764151   fd=0.1764169   | sig: closed=-0.5914674  lap=-0.5914674  fd=-0.5921578 
+t=0.3   x=1.1  | T: closed=0.1114338   lap=0.1114338   fd=0.1114338   | sig: closed=-1.09676    lap=-1.09676    fd=-1.096756  
+t=0.3   x=2.1  | T: closed=0.0427672   lap=0.0427672   fd=0.04276722  | sig: closed=-0.4347294  lap=-0.4347294  fd=-0.4347297 
+t=0.3   x=4.1  | T: closed=0.005798096 lap=0.005798096 fd=0.005798104 | sig: closed=-0.05896765 lap=-0.05896765 fd=-0.05896778
+t=0.75  x=0.1  | T: closed=0.2637451   lap=0.2637451   fd=0.2637476   | sig: closed=0.0920675   lap=0.0920675   fd=0.09221433 
+t=0.75  x=0.5  | T: closed=0.246744    lap=0.246744    fd=0.2467458   | sig: closed=0.5147277   lap=0.5147277   fd=0.5144986  
+t=0.75  x=1.1  | T: closed=0.1915005   lap=0.1915005   fd=0.1915006   | sig: closed=0.4074485   lap=0.4074485   fd=0.4074378  
+t=0.75  x=2.1  | T: closed=0.09276267  lap=0.09276267  fd=0.09276215  | sig: closed=-1.088577   lap=-1.088577   fd=-1.094769  
+t=0.75  x=4.1  | T: closed=0.01378021  lap=0.01378021  fd=0.01378019  | sig: closed=-0.2656368  lap=-0.2656368  fd=-0.2656379 
+t=1.5   x=0.1  | T: closed=0.1989076   lap=0.1989076   fd=0.1989088   | sig: closed=0.01036482  lap=0.01036482  fd=0.01034557 
+t=1.5   x=0.5  | T: closed=0.1925035   lap=0.1925035   fd=0.1925045   | sig: closed=0.05845862  lap=0.05845862  fd=0.05838925 
+t=1.5   x=1.1  | T: closed=0.169067    lap=0.169067    fd=0.1690676   | sig: closed=0.1594357   lap=0.1594357   fd=0.159662   
+t=1.5   x=2.1  | T: closed=0.1110612   lap=0.1110612   fd=0.1110611   | sig: closed=0.467398    lap=0.467398    fd=0.4677811  
+t=1.5   x=4.1  | T: closed=0.02596307  lap=0.02596307  fd=0.02596297  | sig: closed=-0.6303833  lap=-0.6303833  fd=-0.6272417 
+t=2.5   x=0.1  | T: closed=0.1608076   lap=0.1608076   fd=0.1608083   | sig: closed=0.0009535485 lap=0.0009535485 fd=0.0009605862
+t=2.5   x=0.5  | T: closed=0.1575562   lap=0.1575562   fd=0.1575569   | sig: closed=0.006308002 lap=0.006308002 fd=0.006267604
+t=2.5   x=1.1  | T: closed=0.1452258   lap=0.1452258   fd=0.1452263   | sig: closed=0.01904786  lap=0.01904786  fd=0.01908511 
+t=2.5   x=2.1  | T: closed=0.1109526   lap=0.1109526   fd=0.1109527   | sig: closed=0.05240244  lap=0.05240244  fd=0.0522581  
+t=2.5   x=4.1  | T: closed=0.04057058  lap=0.04057058  fd=0.04057045  | sig: closed=0.2126975   lap=0.2126975   fd=0.2122147  
+max |closed - FD|: T 5.91e-06  sigma 6.19e-03
+
+=== large gamma robustness (gamma=100, beta=2): finite values? ===
+t=0.05: [ 0.00000e+00 -5.13462e-01 -1.87217e+00 -3.42930e-02 -1.04903e-08]
+t=0.5: [ 0.00000e+00  7.45348e-02  5.04499e-01 -4.53004e+00 -1.41604e-06]
+t=2: [ 2.77556e-17  4.63023e-03  4.90450e-02  1.47418e-01 -4.53060e+00]
+t=5: [1.85504e-17 6.33884e-05 2.13153e-03 1.87149e-02 2.93814e-02]
+
+=== smooth pulse (A (e^{-2t} - e^{-8t}), A = 4/3) by superposition vs direct de Hoog inversion, gamma = 9 ===
+x=0.1  t=0.1   | T: closed=0.023723613  lap=0.023723613  | sigma: closed=-0.098821554 lap=-0.098821554
+x=1.1  t=0.75  | T: closed=0.1337547    lap=0.1337547    | sigma: closed=-0.094646333 lap=-0.094646333
+x=2.1  t=1.5   | T: closed=0.097982646  lap=0.097982646  | sigma: closed=0.27174764   lap=0.27174764  
+x=0.5  t=2.5   | T: closed=0.16861223   lap=0.16861223   | sigma: closed=0.022776558  lap=0.022776558 
+x=4.1  t=2.5   | T: closed=0.035298627  lap=0.035298627  | sigma: closed=0.25479236   lap=0.25479236  
+max |closed - inversion| over the 5 smooth-pulse points: 5.13e-16
+VERIFY_DONE (driver completed; marker appended Wed Oct 21 04:14:30 +03 2026)
+
+=== ground_truth.py self-test, executed 2026-10-21 07:36 +03 with 'python3 -I chatgpt_pro_job/inputs/ground_truth.py' (Python 3.12.5, NumPy 2.5.1, SciPy 1.16.3) ===
+x=0.1  t=0.1    max abs dev from reference = 3.5e-11
+x=1.1  t=0.3    max abs dev from reference = 2.7e-10
+x=2.1  t=0.75   max abs dev from reference = 4.0e-10
+x=0.5  t=1.5    max abs dev from reference = 2.6e-11
+x=4.1  t=2.5    max abs dev from reference = 4.0e-11
+case exp     grid (241, 240)  |T|max=0.2180  |sigma|max=1.0383
+case step    grid (241, 240)  |T|max=0.3210  |sigma|max=1.5166
+case smooth  grid (241, 240)  |T|max=0.2165  |sigma|max=0.8541
+SELF-TEST PASSED (worst deviation 4.0e-10)

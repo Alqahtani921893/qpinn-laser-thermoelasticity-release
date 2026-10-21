@@ -1,0 +1,2 @@
+== run vqc_exp_g9_data_q6L4_s0_nd16 params 124
+  it   500 loss 4.025e-06 val 3.4997 {'data': 4.024729588316889e-06}  (15s)

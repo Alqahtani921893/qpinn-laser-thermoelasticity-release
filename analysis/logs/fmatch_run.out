@@ -1,0 +1,2 @@
+{'step|ff|4|2': 0.1, 'exp|mlp|6|4': 0.1, 'smooth|ff|4|2': 0.1, 'smooth|mlp|6|4': 0.1, 'smooth|mlp|4|2': 0.1, 'step|ff|6|4': 0.1, 'exp|ff|4|2': 0.1, 'step|mlp|6|4': 0.03, 'exp|mlp|4|2': 0.1, 'smooth|ff|6|4': 0.1, 'exp|ff|6|4': 0.1, 'step|mlp|4|2': 0.03}
+FMATCH_DONE

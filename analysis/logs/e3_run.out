@@ -1,0 +1,3 @@
+data-only lrs {'mlp': 0.1, 'vqc': 0.03}
+E3 aux finished Wed Oct 21 09:52:35 +03 2026: 66 of 68 results (the two VQC N_c = 4096 jobs were dropped)
+E3_DONE

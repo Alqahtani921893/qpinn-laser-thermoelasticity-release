@@ -1,0 +1,1385 @@
+# Code bundle for reproduction (QPINN-LTE-2026-10-20), regenerated 2026-10-21 12:38 +03. Each file is delimited by '===== FILE: name ====='.
+# ground_truth.py is the exact-solution module imported by qpinn_local.py (kept in chatgpt_pro_job/inputs/ in the working tree; next to the scripts in the release archive).
+
+===== FILE: qpinn_local.py =====
+"""qpinn_local.py -- independent local implementation of the QPINN benchmark (PyTorch, exact statevector).
+Models: VQC (data re-uploading, n_q qubits, L layers), MLP, Fourier-feature MLP; class Fields maps the two network
+outputs to the physical fields.  Default parametrisation (param='sigma', used for every reported run): hard initial
+fields T = t*y0, sigma = t*y1.  Physics loss: heat residual T_t - T_xx - e^{-x} f(t), stress residual
+sigma_xx - sigma_tt/gamma - T_tt, surface conditions T_x(0,t) = 0 and sigma(0,t) = 0, exact Dirichlet data at x = x_max
+(domain truncation), and soft initial-rate terms on the collocation points with x >= ic_xmin (default 0.3).  The 'w'
+(w = sigma + gamma T) and 'taylor' parametrisations are superseded variants kept for the record.
+Usage: python qpinn_local.py run|e2 [options]   (see argparse below)."""
+import math, json, time, argparse, os, sys
+import numpy as np, torch
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, '..', 'chatgpt_pro_job', 'inputs'))
+import ground_truth as gt
+torch.set_default_dtype(torch.float64)
+XMAX, TMAX = gt.DOMAIN['x_max'], gt.DOMAIN['t_max']
+
+# ----------------------------------------------------------------------------- quantum model
+def _ry(th):
+    c, s = torch.cos(th / 2), torch.sin(th / 2)
+    return torch.stack([torch.stack([c, -s], -1), torch.stack([s, c], -1)], -2).to(torch.complex128)
+def _rx(th):
+    c, s = torch.cos(th / 2), torch.sin(th / 2)
+    z = torch.zeros_like(c)
+    re = torch.stack([torch.stack([c, z], -1), torch.stack([z, c], -1)], -2)
+    im = torch.stack([torch.stack([z, -s], -1), torch.stack([-s, z], -1)], -2)
+    return torch.complex(re, im)
+def _rz(th):
+    e = torch.exp(-0.5j * th.to(torch.complex128)); z = torch.zeros_like(e)
+    return torch.stack([torch.stack([e, z], -1), torch.stack([z, e.conj()], -1)], -2)
+
+class VQC(torch.nn.Module):
+    """Data re-uploading circuit: per layer, per qubit RY(a*u) RX(b*v) then RZ RY RZ; CZ ring; <Z_k> outputs."""
+    def __init__(self, n_q=6, L=4, n_out=2, seed=0, n_in=2):
+        super().__init__()
+        g = torch.Generator().manual_seed(seed)
+        self.n_q, self.L, self.n_out, self.n_in = n_q, L, n_out, n_in
+        self.enc = torch.nn.Parameter(torch.randn(L, n_q, n_in, generator=g))
+        self.rot = torch.nn.Parameter(torch.rand(L, n_q, 3, generator=g) * 2 * math.pi)
+        self.out_a = torch.nn.Parameter(torch.ones(n_out)); self.out_b = torch.nn.Parameter(torch.zeros(n_out))
+        idx = torch.arange(2 ** n_q)
+        bits = ((idx[:, None] >> (n_q - 1 - torch.arange(n_q))[None, :]) & 1)       # qubit 0 = most significant
+        self.register_buffer('zsign', (1 - 2 * bits).to(torch.float64))               # (2^n, n_q)
+        cz = torch.ones(2 ** n_q)
+        pairs = [(q, (q + 1) % n_q) for q in range(n_q)] if n_q > 2 else ([(0, 1)] if n_q == 2 else [])
+        for q1, q2 in pairs:
+            cz = cz * (1 - 2 * (bits[:, q1] * bits[:, q2]).to(torch.float64))
+        self.register_buffer('cz', cz.to(torch.complex128))
+    def n_params(self):
+        return sum(p.numel() for p in self.parameters())
+    def _apply(self, psi, q, M):
+        B = psi.shape[0]; n = self.n_q
+        p = psi.reshape(B, 2 ** q, 2, 2 ** (n - q - 1))
+        if M.dim() == 2:
+            M = M.expand(B, 2, 2)
+        return torch.matmul(M[:, None, :, :], p).reshape(B, 2 ** n)
+    def forward(self, u, v, phi=None):
+        B = u.shape[0]
+        psi = torch.zeros(B, 2 ** self.n_q, dtype=torch.complex128); psi[:, 0] = 1.0
+        for l in range(self.L):
+            for q in range(self.n_q):
+                # fused single-qubit gate: RZ(r3) RY(r2) RZ(r1) [RY(c phi)] RX(b v) RY(a u)   (rightmost acts first)
+                G = _rz(self.rot[l, q, 2].expand(B)) @ _ry(self.rot[l, q, 1].expand(B)) @ _rz(self.rot[l, q, 0].expand(B))
+                if self.n_in == 3:
+                    G = G @ _ry(self.enc[l, q, 2] * phi)
+                G = G @ _rx(self.enc[l, q, 1] * v) @ _ry(self.enc[l, q, 0] * u)
+                psi = self._apply(psi, q, G)
+            psi = psi * self.cz
+        prob = (psi.real ** 2 + psi.imag ** 2)
+        z = prob @ self.zsign[:, :self.n_out]                                            # (B, n_out)
+        return z * self.out_a + self.out_b
+
+# ----------------------------------------------------------------------------- classical models
+class MLP(torch.nn.Module):
+    def __init__(self, width=8, depth=2, n_out=2, seed=0, n_in=2):
+        super().__init__(); torch.manual_seed(seed)
+        layers, d = [], n_in
+        for _ in range(depth):
+            layers += [torch.nn.Linear(d, width), torch.nn.Tanh()]; d = width
+        layers += [torch.nn.Linear(d, n_out)]
+        self.net = torch.nn.Sequential(*layers)
+    def n_params(self): return sum(p.numel() for p in self.parameters())
+    def forward(self, u, v, phi=None):
+        return self.net(torch.stack([u, v] + ([phi] if phi is not None else []), -1))
+
+class FFMLP(torch.nn.Module):
+    """Random Fourier features (fixed) followed by an MLP."""
+    def __init__(self, m=8, width=6, depth=1, n_out=2, seed=0, scale=1.0, n_in=2):
+        super().__init__(); g = torch.Generator().manual_seed(seed)
+        self.register_buffer('Bf', torch.randn(n_in, m, generator=g) * scale * math.pi)
+        self.mlp = MLP(width=width, depth=depth, n_out=n_out, seed=seed, n_in=2 * m)
+    def n_params(self): return sum(p.numel() for p in self.parameters() if p.requires_grad)
+    def forward(self, u, v, phi=None):
+        z = torch.stack([u, v] + ([phi] if phi is not None else []), -1) @ self.Bf
+        return self.mlp.net(torch.cat([torch.cos(z), torch.sin(z)], -1))
+
+def matched_mlp(target, depth=2, seed=0, n_in=2):
+    best = None
+    for w in range(2, 400):
+        n = MLP(w, depth, seed=seed, n_in=n_in).n_params()
+        if best is None or abs(n - target) < abs(best[1] - target): best = (w, n)
+    return MLP(best[0], depth, seed=seed, n_in=n_in)
+
+def matched_ff(target, m=8, depth=1, seed=0, n_in=2):
+    best = None
+    for w in range(2, 400):
+        n = FFMLP(m, w, depth, seed=seed, n_in=n_in).n_params()
+        if best is None or abs(n - target) < abs(best[1] - target): best = (w, n)
+    return FFMLP(m, best[0], depth, seed=seed, n_in=n_in)
+
+# ----------------------------------------------------------------------------- fields and losses
+class Fields:
+    """Network outputs -> physical fields with hard initial conditions.
+    param='sigma' (default): T = t*y0, sigma = t*y1  (sigma_t(x,0) = y1(x,0) can match -gamma e^{-x} f(0+)).
+    param='w':               T = t*y0, w = t^2*y1, sigma = w - gamma*T  (superseded: the gamma*T cancellation
+                             made sigma errors feed back into T; kept for the record)."""
+    def __init__(self, model, gamma, case, param='sigma', front=False, kappa=3.0):
+        self.m, self.gamma, self.case, self.param, self.front, self.kappa = model, gamma, case, param, front, kappa
+        self.f0 = float(gt.pulse(np.array([0.0]), case)[0])   # f(0+)
+    def sigma(self, x, t):
+        u = 2 * x / XMAX - 1; v = 2 * t / TMAX - 1
+        if self.front:   # smooth characteristic coordinate: which side of the wave front x = sqrt(gamma) t
+            phi = torch.tanh(self.kappa * (t - x / math.sqrt(self.gamma)))
+            y = self.m(u, v, phi)
+        else:
+            y = self.m(u, v)
+        if self.param == 'taylor':
+            # hard initial conditions including the initial rates:  T_t(x,0) = e^{-x} f(0+)  (heat eq. at t=0)
+            # and sigma_t(x,0+) = -gamma e^{-x} f(0+)  (impulsive launch of the stress wave); the network learns the O(t^2) rest.
+            ex = torch.exp(-x) * self.f0
+            return t * ex + t ** 2 * y[:, 0], -self.gamma * t * ex + t ** 2 * y[:, 1]
+        T = t * y[:, 0]
+        if self.param == 'sigma':
+            # sigma = t y1 (unscaled; the gamma-scaled variant sigma = gamma t y1 started the circuits far from the
+            # solution and trained worse at equal budget, see STATUS.md 20 Oct)
+            return T, t * y[:, 1]
+        return T, t ** 2 * y[:, 1] - self.gamma * T
+    def __call__(self, x, t):
+        T, S = self.sigma(x, t); return T, S + self.gamma * T
+
+def grad(y, x):
+    return torch.autograd.grad(y, x, torch.ones_like(y), create_graph=True)[0]
+
+def physics_loss(F, xc, tc, tb, Tb6, Sb6, weights=(1.0, 1.0, 1.0), w_scale=None, ic_weight=1.0, ic_xmin=0.3):
+    xc = xc.requires_grad_(True); tc = tc.requires_grad_(True)
+    T, S = F.sigma(xc, tc)
+    T_t = grad(T, tc); T_tt = grad(T_t, tc); T_x = grad(T, xc); T_xx = grad(T_x, xc)
+    S_t = grad(S, tc); S_tt = grad(S_t, tc); S_x = grad(S, xc); S_xx = grad(S_x, xc)
+    f = torch.as_tensor(gt.pulse(tc.detach().numpy(), F.case))
+    r_h = T_t - T_xx - torch.exp(-xc) * f                       # heat equation
+    r_w = S_xx - S_tt / F.gamma - T_tt                           # stress wave equation, eq. (15) form
+    if w_scale is not None: r_w = r_w / w_scale
+    # surface x = 0
+    x0 = torch.zeros_like(tb).requires_grad_(True); t0 = tb.clone()
+    T0, s0 = F.sigma(x0, t0); T0_x = grad(T0, x0)
+    # far boundary x = XMAX (exact Dirichlet data)
+    x6 = torch.full_like(tb, XMAX); T6, s6 = F.sigma(x6, tb)
+    # initial rates at t = 0 (soft):  T_t(x,0) = e^{-x} f(0+),  sigma_t(x,0+) = -gamma e^{-x} f(0+)
+    # (with T = t*y0, sigma = t*y1 these are conditions on y(x, t=0); the sigma rate is what makes the stress problem well posed)
+    li = torch.zeros(())
+    if F.param == 'sigma' and ic_weight > 0:
+        # the exact rates are discontinuous at the corner (x, t) = (0, 0) (free surface), so the rate condition is
+        # imposed only for x >= ic_xmin
+        xi = xc.detach(); xi = xi[xi >= ic_xmin]
+        yi = F.m(2 * xi / XMAX - 1, torch.full_like(xi, -1.0), *([torch.tanh(F.kappa * (-xi / math.sqrt(F.gamma)))] if F.front else []))
+        ex = torch.exp(-xi) * F.f0
+        li = ic_weight * (((yi[:, 0] - ex) ** 2).mean() + (((yi[:, 1] + F.gamma * ex) / F.gamma) ** 2).mean())
+    lp = (r_h ** 2).mean() + (r_w ** 2).mean()
+    lb = (T0_x ** 2).mean() + (s0 ** 2).mean() + ((T6 - Tb6) ** 2).mean() + ((s6 - Sb6) ** 2).mean() + li
+    return weights[0] * lp + weights[1] * lb, dict(pde=lp.item(), bc=lb.item(), ic=float(li.detach()))
+
+def data_loss(F, xd, td, Td, Sd):
+    T, S = F.sigma(xd, td)
+    return ((T - Td) ** 2).mean() + ((S - Sd) ** 2).mean()
+
+# ----------------------------------------------------------------------------- evaluation
+def evaluate(F, gamma, case, n=241):
+    X, Tt = gt.test_grid(n)
+    Te, Se = gt.exact(X, Tt, case, gamma)
+    with torch.no_grad():
+        T, S = F.sigma(torch.as_tensor(X.ravel()), torch.as_tensor(Tt.ravel()))
+    T = T.numpy().reshape(X.shape); S = S.numpy().reshape(X.shape)
+    return dict(relL2_T=gt.rel_l2(T, Te), relL2_sigma=gt.rel_l2(S, Se),
+                maxabs_T=float(np.abs(T - Te).max()), maxabs_sigma=float(np.abs(S - Se).max()))
+
+# ----------------------------------------------------------------------------- training
+def sample_colloc(rng, n, mode='mixed'):
+    """Collocation sampling.  'uniform': uniform on the domain.  'mixed': half uniform, half concentrated
+    near the heated corner and the early times (x ~ Exp(1), t ~ Exp(0.7), truncated), where the source and
+    the wave launch live.  The physics loss is then a weighted residual integral; the weighting is declared."""
+    if mode == 'uniform':
+        return rng.uniform(0, XMAX, n), rng.uniform(1e-3, TMAX, n)
+    n1 = n // 2; n2 = n - n1
+    x1 = rng.uniform(0, XMAX, n1); t1 = rng.uniform(1e-3, TMAX, n1)
+    x2 = np.minimum(rng.exponential(1.0, n2), XMAX); t2 = np.clip(rng.exponential(0.7, n2), 1e-3, TMAX)
+    return np.concatenate([x1, x2]), np.concatenate([t1, t2])
+
+def train(model, case, gamma, regime='physics', iters=3000, lr=5e-3, n_c=1024, n_b=128, n_d=256,
+          seed=0, log_every=500, val_points=2000, verbose=True, sampling='mixed', weights=(1.0, 1.0, 1.0),
+          w_scale=None, lbfgs_iters=0, front=False, param='sigma', ic_weight=1.0, ic_xmin=0.3):
+    rng = np.random.default_rng(seed); torch.manual_seed(seed)
+    F = Fields(model, gamma, case, param=param, front=front)
+    # fixed far-boundary data and validation/data sets from the exact solution
+    tbb = rng.uniform(1e-3, TMAX, 4096); Tb_all, Sb_all = gt.exact(np.full_like(tbb, XMAX), tbb, case, gamma)
+    xv = rng.uniform(0, XMAX, val_points); tv = rng.uniform(1e-3, TMAX, val_points); Tv, Sv = gt.exact(xv, tv, case, gamma)
+    xd = rng.uniform(0, XMAX, n_d); td = rng.uniform(1e-3, TMAX, n_d); Td, Sd = gt.exact(xd, td, case, gamma)
+    xd, td, Td, Sd = map(torch.as_tensor, (xd, td, Td, Sd))
+    opt = torch.optim.Adam(model.parameters(), lr=lr)
+    sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, iters, eta_min=lr * 0.05)
+    t0 = time.time(); hist = []; gnorms = []
+    for it in range(1, iters + 1):
+        opt.zero_grad()
+        parts = {}
+        if regime in ('physics', 'combined'):
+            xc_np, tc_np = sample_colloc(rng, n_c, sampling); xc = torch.as_tensor(xc_np); tc = torch.as_tensor(tc_np)
+            ib = rng.integers(0, 4096, n_b)
+            tb = torch.as_tensor(tbb[ib]); Tb6 = torch.as_tensor(Tb_all[ib]); Sb6 = torch.as_tensor(Sb_all[ib])
+            loss, parts = physics_loss(F, xc, tc, tb, Tb6, Sb6, weights, w_scale, ic_weight, ic_xmin)
+        else:
+            loss = torch.zeros(())
+        if regime in ('data', 'combined'):
+            ld = data_loss(F, xd, td, Td, Sd); parts['data'] = ld.item(); loss = loss + ld
+        loss.backward()
+        gn = math.sqrt(sum((p.grad ** 2).sum().item() for p in model.parameters() if p.grad is not None))
+        gnorms.append(gn)
+        opt.step(); sched.step()
+        if it % log_every == 0 or it == iters:
+            with torch.no_grad():
+                T, S = F.sigma(torch.as_tensor(xv), torch.as_tensor(tv))
+                val = gt.rel_l2(T.numpy(), Tv) + gt.rel_l2(S.numpy(), Sv)
+            hist.append(dict(it=it, loss=loss.item(), val=val, **parts))
+            if verbose: print("  it %5d loss %.3e val %.4f %s  (%.0fs)" % (it, loss.item(), val, parts, time.time() - t0), flush=True)
+    if lbfgs_iters > 0 and regime in ('physics', 'combined'):
+        xf_np, tf_np = sample_colloc(rng, 4 * n_c, sampling); xf = torch.as_tensor(xf_np); tf = torch.as_tensor(tf_np)
+        ibf = rng.integers(0, 4096, 4 * n_b); tbf = torch.as_tensor(tbb[ibf]); Tbf = torch.as_tensor(Tb_all[ibf]); Sbf = torch.as_tensor(Sb_all[ibf])
+        lb = torch.optim.LBFGS(model.parameters(), lr=1.0, max_iter=lbfgs_iters, max_eval=int(lbfgs_iters * 1.25),
+                               tolerance_grad=1e-12, tolerance_change=1e-14, history_size=50, line_search_fn='strong_wolfe')
+        state = dict(n=0)
+        def closure():
+            lb.zero_grad()
+            loss, _ = physics_loss(F, xf.clone(), tf.clone(), tbf, Tbf, Sbf, weights, w_scale, ic_weight, ic_xmin)
+            if regime == 'combined': loss = loss + data_loss(F, xd, td, Td, Sd)
+            loss.backward(); state['n'] += 1
+            return loss
+        lb.step(closure)
+        with torch.no_grad():
+            T, S = F.sigma(torch.as_tensor(xv), torch.as_tensor(tv))
+            val = gt.rel_l2(T.numpy(), Tv) + gt.rel_l2(S.numpy(), Sv)
+        hist.append(dict(it=iters, lbfgs_evals=state['n'], val=val))
+        if verbose: print("  lbfgs %d evals  val %.4f  (%.0fs)" % (state['n'], val, time.time() - t0), flush=True)
+    res = evaluate(F, gamma, case)
+    res.update(dict(train_s=time.time() - t0, iters=iters, n_params=model.n_params(), val=hist[-1]['val'],
+                    hist=hist, gradnorm_first=float(np.mean(gnorms[:50])), gradnorm_last=float(np.mean(gnorms[-50:]))))
+    return res
+
+def make_model(kind, n_q=6, L=4, target=None, seed=0, n_in=2):
+    if kind == 'vqc': return VQC(n_q, L, seed=seed, n_in=n_in)
+    if kind == 'mlp': return matched_mlp(target, seed=seed, n_in=n_in)
+    if kind == 'ff': return matched_ff(target, seed=seed, n_in=n_in)
+    if kind == 'mlpref': return MLP(64, 4, seed=seed, n_in=n_in)
+    raise ValueError(kind)
+
+# ----------------------------------------------------------------------------- E2: gradient variance at init
+def grad_variance(n_q, L, loss_type, case='exp', gamma=9.0, n_init=200, n_pts=256, seed=0):
+    rng = np.random.default_rng(seed)
+    xc = torch.as_tensor(rng.uniform(0, XMAX, n_pts)); tc = torch.as_tensor(rng.uniform(1e-3, TMAX, n_pts))
+    tb = torch.as_tensor(rng.uniform(1e-3, TMAX, 64)); Tb6, Sb6 = gt.exact(np.full(64, XMAX), tb.numpy(), case, gamma)
+    Tb6, Sb6 = torch.as_tensor(Tb6), torch.as_tensor(Sb6)
+    Td, Sd = gt.exact(xc.numpy(), tc.numpy(), case, gamma); Td, Sd = torch.as_tensor(Td), torch.as_tensor(Sd)
+    gs = []
+    for i in range(n_init):
+        m = VQC(n_q, L, seed=10000 * seed + i); F = Fields(m, gamma, case)
+        if loss_type == 'data': loss = data_loss(F, xc, tc, Td, Sd)
+        elif loss_type == 'physics': loss, _ = physics_loss(F, xc.clone(), tc.clone(), tb, Tb6, Sb6)
+        else:
+            lp, _ = physics_loss(F, xc.clone(), tc.clone(), tb, Tb6, Sb6); loss = lp + data_loss(F, xc, tc, Td, Sd)
+        g = torch.autograd.grad(loss, m.rot)[0][0, 0, 1].item()      # first-layer RY angle on qubit 0
+        gs.append(g)
+    gs = np.array(gs)
+    return dict(n_q=n_q, L=L, loss=loss_type, var=float(gs.var()), mean_abs=float(np.abs(gs).mean()), n_init=n_init)
+
+# ----------------------------------------------------------------------------- CLI
+if __name__ == '__main__':
+    ap = argparse.ArgumentParser()
+    ap.add_argument('cmd', choices=['smoke', 'pilot', 'e1', 'e2', 'e3', 'run'])
+    ap.add_argument('--model', default='vqc'); ap.add_argument('--seed', type=int, default=0); ap.add_argument('--tag', default='')
+    ap.add_argument('--ic_weight', type=float, default=1.0); ap.add_argument('--ic_xmin', type=float, default=0.3); ap.add_argument('--n_b', type=int, default=128)
+    ap.add_argument('--target', type=int, default=0, help='override the parameter-count target for matched classical nets (0 = VQC count)')
+    ap.add_argument('--case', default='exp'); ap.add_argument('--gamma', type=float, default=9.0)
+    ap.add_argument('--n_q', type=int, default=6); ap.add_argument('--L', type=int, default=4)
+    ap.add_argument('--iters', type=int, default=3000); ap.add_argument('--lr', type=float, default=5e-3)
+    ap.add_argument('--seeds', type=int, default=3); ap.add_argument('--regime', default='physics')
+    ap.add_argument('--models', default='vqc,mlp,ff'); ap.add_argument('--out', default='results')
+    ap.add_argument('--n_c', type=int, default=1024); ap.add_argument('--n_d', type=int, default=256)
+    ap.add_argument('--sampling', default='mixed'); ap.add_argument('--lbfgs', type=int, default=0); ap.add_argument('--w_scale', type=float, default=None)
+    a = ap.parse_args(); os.makedirs(os.path.join(HERE, a.out), exist_ok=True)
+    if a.cmd == 'smoke':
+        m = VQC(4, 2); F = Fields(m, a.gamma, a.case)
+        x = torch.tensor([0.5, 1.0]); t = torch.tensor([0.5, 1.0])
+        loss, parts = physics_loss(F, x, t, torch.tensor([0.3, 0.7]), torch.tensor([0.0, 0.0]), torch.tensor([0.0, 0.0]))
+        loss.backward(); print("smoke: loss", loss.item(), parts, "grad ok", m.rot.grad.abs().sum().item() > 0)
+        for k, tgt in [('mlp', m.n_params()), ('ff', m.n_params())]:
+            mm = make_model(k, target=tgt); print(k, 'matched params', mm.n_params(), 'target', tgt)
+        r = train(VQC(4, 2), a.case, a.gamma, iters=50, log_every=25); print({k: v for k, v in r.items() if k != 'hist'})
+    elif a.cmd in ('pilot', 'e1'):
+        vq = VQC(a.n_q, a.L); target = vq.n_params(); out = []
+        for kind in a.models.split(','):
+            for s in range(a.seeds):
+                m = make_model(kind, a.n_q, a.L, target, seed=s)
+                print("== %s seed %d params %d case %s gamma %g regime %s" % (kind, s, m.n_params(), a.case, a.gamma, a.regime), flush=True)
+                r = train(m, a.case, a.gamma, regime=a.regime, iters=a.iters, lr=a.lr, n_c=a.n_c, n_d=a.n_d, seed=s, sampling=a.sampling, w_scale=a.w_scale, lbfgs_iters=a.lbfgs)
+                r.update(dict(model=kind, seed=s, case=a.case, gamma=a.gamma, regime=a.regime, lr=a.lr, n_q=a.n_q, L=a.L))
+                out.append(r); print("   -> relL2 T %.4f sigma %.4f (%.0fs)" % (r['relL2_T'], r['relL2_sigma'], r['train_s']), flush=True)
+                json.dump(out, open(os.path.join(HERE, a.out, '%s_%s_g%g_%s_q%dL%d.json' % (a.cmd, a.case, a.gamma, a.regime, a.n_q, a.L)), 'w'), indent=1)
+    elif a.cmd == 'run':
+        vq = VQC(a.n_q, a.L); target = a.target if a.target > 0 else vq.n_params()
+        m = make_model(a.model, a.n_q, a.L, target, seed=a.seed)
+        name = '%s_%s_g%g_%s_q%dL%d_s%d%s' % (a.model, a.case, a.gamma, a.regime, a.n_q, a.L, a.seed, ('_' + a.tag) if a.tag else '')
+        print("== run", name, "params", m.n_params(), flush=True)
+        r = train(m, a.case, a.gamma, regime=a.regime, iters=a.iters, lr=a.lr, n_c=a.n_c, n_b=a.n_b, n_d=a.n_d, seed=a.seed,
+                  sampling=a.sampling, w_scale=a.w_scale, lbfgs_iters=a.lbfgs, ic_weight=a.ic_weight, ic_xmin=a.ic_xmin, log_every=500)
+        r.update(dict(model=a.model, seed=a.seed, case=a.case, gamma=a.gamma, regime=a.regime, lr=a.lr, n_q=a.n_q, L=a.L, n_c=a.n_c,
+                      n_d=a.n_d, lbfgs=a.lbfgs, sampling=a.sampling, ic_weight=a.ic_weight, ic_xmin=a.ic_xmin, target_params=target, name=name))
+        json.dump(r, open(os.path.join(HERE, a.out, name + '.json'), 'w'), indent=1)
+        torch.save(m.state_dict(), os.path.join(HERE, a.out, name + '.pt'))
+        print("   -> relL2 T %.4f sigma %.4f (%.0fs)" % (r['relL2_T'], r['relL2_sigma'], r['train_s']), flush=True)
+    elif a.cmd == 'e2':
+        out = []
+        for L in (2, 4, 8):
+            for n_q in range(2, 11):
+                for lt in ('data', 'physics', 'combined'):
+                    r = grad_variance(n_q, L, lt, a.case, a.gamma, n_init=200); out.append(r)
+                    print(r, flush=True)
+                    json.dump(out, open(os.path.join(HERE, a.out, 'e2_%s_g%g.json' % (a.case, a.gamma)), 'w'), indent=1)
+
+===== FILE: ground_truth.py =====
+"""ground_truth.py -- exact solutions of the nondimensional laser-pulse thermoelastic problem
+(one-dimensional, semi-infinite solid, Beer-Lambert volumetric source, one-way coupled stress wave).
+
+    T_t = T_xx + e^{-x} f(t),                T_x(0,t) = 0,   T(x,0) = 0,            x >= 0
+    sigma_xx - (1/gamma) sigma_tt = T_tt,     sigma(0,t) = 0, sigma(x,0) = 0,
+    sigma_t(x,0+) = -gamma e^{-x} f(0+)       (all fields identically zero for t < 0; this is the
+                                              initial rate implied by u_t = 0 and the constitutive law)
+
+Pulses:   exp     f = Ae exp(-beta t)
+          step    f = As [H(t) - H(t - Delta)]
+          smooth  f = A [exp(-beta1 t) - exp(-beta2 t)]      (f(0+) = 0: no impulsive wave launch)
+
+The closed forms below were obtained by Laplace transform (residues + standard erfc tables).  They are
+NOT the formulas printed in Al-Qahtani, Lasers in Engineering (2026), eqs. (11), (12), (19)-(26), which
+contain sign/coefficient errors (they violate T(x,0) = 0 and grow like exp(gamma t)).  Verification scope (log: verification_log_closed_form.txt): (i) against a 30-digit de Hoog numerical inverse
+Laplace transform the corrected forms agree to the printed 7 significant digits at 25 (x, t) points per pulse
+for the exponential and the rectangular pulse (gamma = 9), and the smooth-pulse superposition agrees with the
+direct inversion of its transform to 5.1e-16 at 5 points; (ii) against a method-of-lines finite-difference
+solution (RK4, dx = 0.01) the maxima of |closed form - FD| over the same 25 points are T 4.20e-6 / sigma 6.18e-3
+(exponential) and T 5.91e-6 / sigma 6.19e-3 (rectangular), the sigma value being the FD discretisation error at
+the wave front, not a closed-form error; (iii) the self-test below regresses five points against stored 30-digit
+inversion values (worst deviation 4.0e-10).  These are pointwise checks, not a uniform accuracy bound.
+Only numpy and scipy are required.  Run `python ground_truth.py` for the self-test.
+"""
+import numpy as np
+from scipy.special import erfc, erfcx, dawsn
+
+# ----------------------------------------------------------------------------- helpers
+def _xi(x, t):
+    return x / (2.0 * np.sqrt(t))
+
+def _Eerfcx(xi, u):
+    """Stable e^{-xi^2} erfcx(u) for real u of either sign, using erfcx(-u) = 2 e^{u^2} - erfcx(u)."""
+    u = np.asarray(u, float)
+    direct = np.exp(-xi**2) * erfcx(np.where(u >= 0, u, 0.0))
+    alt = 2.0 * np.exp(u**2 - xi**2) - np.exp(-xi**2) * erfcx(np.where(u < 0, -u, 0.0))
+    return np.where(u >= 0, direct, alt)
+
+# ----------------------------------------------------------------------------- temperature
+def T_exp(x, t, beta, Ae=1.0):
+    """f = Ae e^{-beta t}.  Conventional form:
+    T = Ae/(1+beta) { e^{t-x}/2 erfc((2t-x)/(2 sqrt t)) + e^{t+x}/2 erfc((2t+x)/(2 sqrt t)) - e^{-x-beta t}
+                      - e^{-beta t}/sqrt(beta) Im[ e^{i sqrt(beta) x} erfc(x/(2 sqrt t) + i sqrt(beta t)) ] }"""
+    x = np.asarray(x, float); t = np.asarray(t, float)
+    xi = _xi(x, t); E = np.exp(-xi**2); eta = np.sqrt(beta * t)
+    val = (0.5 * _Eerfcx(xi, np.sqrt(t) - xi) + 0.5 * E * erfcx(xi + np.sqrt(t))
+           - np.exp(-x - beta * t)
+           - E * np.imag(erfcx(xi + 1j * eta)) / np.sqrt(beta)) / (1.0 + beta)
+    return Ae * val
+
+def _U_T(x, t):
+    """Unit continuous heating f = H(t):
+    U_T = -e^{-x} + e^{t-x}/2 erfc((2t-x)/(2 sqrt t)) + e^{t+x}/2 erfc((2t+x)/(2 sqrt t))
+          + 2 sqrt(t/pi) e^{-x^2/(4t)} - x erfc(x/(2 sqrt t))"""
+    xi = _xi(x, t); E = np.exp(-xi**2)
+    return (-np.exp(-x) + 0.5 * _Eerfcx(xi, np.sqrt(t) - xi) + 0.5 * E * erfcx(xi + np.sqrt(t))
+            + 2.0 * np.sqrt(t / np.pi) * E - x * erfc(xi))
+
+def T_step(x, t, As, Delta):
+    x = np.asarray(x, float); t = np.asarray(t, float)
+    out = As * _U_T(x, t)
+    m = t > Delta
+    if np.any(m):
+        out = np.where(m, out - As * _U_T(x, np.where(m, t - Delta, 1.0)), out)
+    return out
+
+def T_smooth(x, t, beta1, beta2, A):
+    return T_exp(x, t, beta1, A) - T_exp(x, t, beta2, A)
+
+# ----------------------------------------------------------------------------- stress
+def _sigma_unit(x, t, beta, gamma):
+    """Stress for f = e^{-beta t} (beta = 0 gives the unit-step response).  With a = sqrt(gamma),
+    tau = x/a, xi = x/(2 sqrt t), eta = sqrt(beta t) and
+      c1 = g/((g-1)(1+b)), c2 = g/((g-1)(g+b)), c3 = -g/((1+b)(g+b)),
+      r+ = -g a/(2(a-1)(a+b)), r- = g a/(2(a+1)(a-b)), rb = g b^2/((1+b)(b^2-g)),
+    sigma = c1 [ -e^{-xi^2}/sqrt(pi t) + e^{t+x}/2 erfc(xi+sqrt t) + e^{t-x}/2 erfc(sqrt t - xi) ]
+          + c2 [  e^{-xi^2}/sqrt(pi t) - a/2 e^{g t + a x} erfc(xi + a sqrt t) + a/2 e^{g t - a x} erfc(xi - a sqrt t) ]
+          + c3 [ -e^{-xi^2}/sqrt(pi t) - sqrt(b) e^{-b t} Im( e^{i sqrt(b) x} erfc(xi + i eta) ) ]
+          + rb e^{-b t - x} + r+ e^{a t - x} + r- e^{-a t - x}
+          + H(t - tau) { c1 [ 1/sqrt(pi(t-tau)) - e^{t-tau} erfc(sqrt(t-tau)) ]
+                        + c2 [ -1/sqrt(pi(t-tau)) - a e^{g(t-tau)} erf(a sqrt(t-tau)) ]
+                        + c3 [ 1/sqrt(pi(t-tau)) - sqrt(b) e^{-b(t-tau)} erfi(sqrt(b(t-tau))) ]
+                        - rb e^{-b(t-tau)} - r+ e^{a(t-tau)} - r- e^{-a(t-tau)} }.
+    The implementation regroups the exponentially growing pieces (which cancel behind the wave front)
+    into bounded erfcx terms.  Singular parameter combinations to avoid: gamma = 1, a = beta, beta^2 = gamma."""
+    x = np.asarray(x, float); t = np.asarray(t, float)
+    a = np.sqrt(gamma); xi = _xi(x, t); E = np.exp(-xi**2); st = np.sqrt(t)
+    c1 = gamma / ((gamma - 1) * (1 + beta))
+    c2 = gamma / ((gamma - 1) * (gamma + beta))
+    c3 = -gamma / ((1 + beta) * (gamma + beta))
+    r_a = -gamma * a / (2 * (a - 1) * (a + beta))
+    r_ma = gamma * a / (2 * (a + 1) * (a - beta))
+    r_b = gamma * beta**2 / ((1 + beta) * (beta**2 - gamma))
+    tau = x / a; H = (t > tau); tm = np.where(H, t - tau, 1.0)
+    spt = np.sqrt(np.pi * t); sptm = np.sqrt(np.pi * tm)
+    g1 = c1 * (-E / spt + 0.5 * E * erfcx(xi + st) + 0.5 * _Eerfcx(xi, st - xi)
+               + np.where(H, 1.0 / sptm - erfcx(np.sqrt(tm)), 0.0))
+    ahead = c2 * (E / spt - 0.5 * a * E * erfcx(xi + a * st) + 0.5 * a * _Eerfcx(xi, xi - a * st))
+    behind = c2 * (E / spt - 0.5 * a * E * erfcx(xi + a * st) - 0.5 * a * _Eerfcx(xi, a * st - xi)
+                   + a * erfcx(a * np.sqrt(tm)) - 1.0 / sptm)
+    g2 = np.where(H, behind, ahead)
+    eta = np.sqrt(beta * t); etam = np.sqrt(beta * tm)
+    g3 = (-c3 * E / spt - c3 * np.sqrt(beta) * E * np.imag(erfcx(xi + 1j * eta))
+          + r_b * np.exp(-beta * t - x)
+          + np.where(H, c3 / sptm - c3 * np.sqrt(beta) * (2 / np.sqrt(np.pi)) * dawsn(etam)
+                     - r_b * np.exp(-beta * tm), 0.0))
+    g4 = r_a * np.exp(a * t - x) * (~H) + r_ma * (np.exp(-a * t - x) - np.where(H, np.exp(x - a * t), 0.0))
+    return g1 + g2 + g3 + g4
+
+def sigma_exp(x, t, beta, gamma, Ae=1.0):
+    return Ae * _sigma_unit(x, t, beta, gamma)
+
+def sigma_step(x, t, As, Delta, gamma):
+    x = np.asarray(x, float); t = np.asarray(t, float)
+    out = As * _sigma_unit(x, t, 0.0, gamma)
+    m = t > Delta
+    if np.any(m):
+        out = np.where(m, out - As * _sigma_unit(x, np.where(m, t - Delta, 1.0), 0.0, gamma), out)
+    return out
+
+def sigma_smooth(x, t, beta1, beta2, A, gamma):
+    return sigma_exp(x, t, beta1, gamma, A) - sigma_exp(x, t, beta2, gamma, A)
+
+# ----------------------------------------------------------------------------- benchmark cases
+CASES = {
+    # equal pulse energy E0 = 0.5 in every case
+    "exp":    dict(kind="exp",    beta=2.0, Ae=1.0),
+    "step":   dict(kind="step",   As=1.0, Delta=0.5),
+    "smooth": dict(kind="smooth", beta1=2.0, beta2=8.0, A=4.0/3.0),
+}
+DOMAIN = dict(x_max=6.0, t_max=3.0)
+GAMMA_MAIN = 9.0
+GAMMA_SECONDARY = (25.0, 49.0)
+
+def pulse(t, case):
+    c = CASES[case] if isinstance(case, str) else case
+    t = np.asarray(t, float)
+    if c["kind"] == "exp":
+        return c["Ae"] * np.exp(-c["beta"] * t) * (t >= 0)
+    if c["kind"] == "step":
+        return c["As"] * ((t >= 0) & (t < c["Delta"])).astype(float)
+    return c["A"] * (np.exp(-c["beta1"] * t) - np.exp(-c["beta2"] * t)) * (t >= 0)
+
+def exact(x, t, case, gamma=GAMMA_MAIN):
+    """Return (T, sigma) for the named case at points x, t (t > 0)."""
+    c = CASES[case] if isinstance(case, str) else case
+    if c["kind"] == "exp":
+        return T_exp(x, t, c["beta"], c["Ae"]), sigma_exp(x, t, c["beta"], gamma, c["Ae"])
+    if c["kind"] == "step":
+        return T_step(x, t, c["As"], c["Delta"]), sigma_step(x, t, c["As"], c["Delta"], gamma)
+    return (T_smooth(x, t, c["beta1"], c["beta2"], c["A"]),
+            sigma_smooth(x, t, c["beta1"], c["beta2"], c["A"], gamma))
+
+def test_grid(n=241, x_max=DOMAIN["x_max"], t_max=DOMAIN["t_max"]):
+    """Fixed evaluation grid: n x-nodes on [0, x_max], n-1 t-nodes on (0, t_max] (t = 0 excluded)."""
+    x = np.linspace(0.0, x_max, n)
+    t = np.linspace(0.0, t_max, n)[1:]
+    X, Tt = np.meshgrid(x, t, indexing="ij")
+    return X, Tt
+
+def rel_l2(pred, ref):
+    pred = np.asarray(pred, float); ref = np.asarray(ref, float)
+    return float(np.linalg.norm(pred - ref) / np.linalg.norm(ref))
+
+# ----------------------------------------------------------------------------- self-test
+_REFERENCE = [  # (x, t, T_exp, sigma_exp, T_step, sigma_step) from a 30-digit de Hoog inverse Laplace transform,
+                # beta=2, Ae=1 | As=1, Delta=0.5 | gamma=9
+    (0.1, 0.1, 0.07149377465, -0.1601574284, 0.07917932781, -0.1951384832),
+    (1.1, 0.3, 0.08442477929, -0.8394758361, 0.1114338174, -1.096760078),
+    (2.1, 0.75, 0.07008054175, -0.7143076852, 0.09276267359, -1.088576979),
+    (0.5, 1.5, 0.195006974, 0.08181417056, 0.1925034837, 0.05845862163),
+    (4.1, 2.5, 0.0369710468, 0.231600584, 0.04057057671, 0.2126974832),
+]
+
+if __name__ == "__main__":
+    worst = 0.0
+    for x, t, Te, Se, Ts, Ss in _REFERENCE:
+        d = [abs(float(T_exp(x, t, 2.0)) - Te), abs(float(sigma_exp(x, t, 2.0, 9.0)) - Se),
+             abs(float(T_step(x, t, 1.0, 0.5)) - Ts), abs(float(sigma_step(x, t, 1.0, 0.5, 9.0)) - Ss)]
+        worst = max(worst, max(d))
+        print("x=%-4g t=%-5g  max abs dev from reference = %.1e" % (x, t, max(d)))
+    X, Tt = test_grid()
+    for case in CASES:
+        T, S = exact(X, Tt, case)
+        assert np.all(np.isfinite(T)) and np.all(np.isfinite(S)), case
+        print("case %-6s  grid %s  |T|max=%.4f  |sigma|max=%.4f" % (case, T.shape, np.abs(T).max(), np.abs(S).max()))
+    print("SELF-TEST", "PASSED" if worst < 1e-9 else "FAILED", "(worst deviation %.1e)" % worst)
+
+===== FILE: noise_eval.py =====
+"""noise_eval.py -- E4: hardware-realism evaluation of a trained VQC (inference only).
+(a) finite shots: each <Z_k> estimated from N_shots Bernoulli samples of the exact probability (1+<Z_k>)/2;
+(b) depolarising noise: single-qubit depolarising channel with probability p applied to every qubit after every
+    layer, simulated exactly with a density matrix (numpy), for n_q <= 8."""
+import numpy as np, torch, sys, os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import qpinn_local as q, ground_truth as gt
+
+def gate_matrices(model, u, v):
+    """Per-point list over layers of per-qubit fused 2x2 gates (numpy complex), from the torch model."""
+    with torch.no_grad():
+        B = u.shape[0]; out = []
+        for l in range(model.L):
+            layer = []
+            for k in range(model.n_q):
+                G = (q._rz(model.rot[l, k, 2].expand(B)) @ q._ry(model.rot[l, k, 1].expand(B)) @ q._rz(model.rot[l, k, 0].expand(B))
+                     @ q._rx(model.enc[l, k, 1] * v) @ q._ry(model.enc[l, k, 0] * u))
+                layer.append(G.numpy())
+            out.append(layer)
+        return out
+
+def _apply_rho(rho, k, G, n):
+    # rho: (B, 2^n, 2^n); apply G on qubit k: rho -> (G_k) rho (G_k)^dagger
+    B = rho.shape[0]; d = 2 ** n
+    r = rho.reshape(B, 2 ** k, 2, 2 ** (n - k - 1), d)
+    r = np.einsum('bij,bajcm->baicm', G, r).reshape(B, d, d)
+    r = r.reshape(B, d, 2 ** k, 2, 2 ** (n - k - 1))
+    r = np.einsum('bij,bmajc->bmaic', G.conj(), r).reshape(B, d, d)
+    return r
+
+def _depolarise(rho, k, p, n):
+    B = rho.shape[0]; d = 2 ** n
+    X = np.array([[0, 1], [1, 0]], complex); Y = np.array([[0, -1j], [1j, 0]]); Z = np.diag([1.0, -1.0]).astype(complex)
+    out = (1 - p) * rho
+    for P in (X, Y, Z):
+        out = out + (p / 3) * _apply_rho(rho, k, np.broadcast_to(P, (B, 2, 2)), n)
+    return out
+
+def noisy_expectations(model, x, t, p=0.0, shots=None, rng=None):
+    u = 2 * x / q.XMAX - 1; v = 2 * t / q.TMAX - 1
+    ut, vt = torch.as_tensor(u), torch.as_tensor(v)
+    n = model.n_q; B = len(x); d = 2 ** n
+    gates = gate_matrices(model, ut, vt)
+    psi0 = np.zeros(d, complex); psi0[0] = 1
+    rho = np.broadcast_to(np.outer(psi0, psi0.conj()), (B, d, d)).copy()
+    cz = model.cz.numpy()
+    for l in range(model.L):
+        for k in range(n):
+            rho = _apply_rho(rho, k, gates[l][k], n)
+        rho = rho * cz[None, :, None] * cz.conj()[None, None, :]
+        if p > 0:
+            for k in range(n):
+                rho = _depolarise(rho, k, p, n)
+    probs = np.real(np.einsum('bii->bi', rho))
+    zs = model.zsign.numpy()[:, :model.n_out]
+    ez = probs @ zs
+    if shots is not None:
+        rng = rng or np.random.default_rng(0)
+        pk = (1 + ez) / 2
+        ez = 2 * rng.binomial(shots, np.clip(pk, 0, 1)) / shots - 1
+    a = model.out_a.detach().numpy(); b = model.out_b.detach().numpy()
+    y = ez * a + b
+    # parametrisation of qpinn_local.Fields(param='sigma'):  T = t y0,  sigma = t y1
+    T = t * y[:, 0]; S = t * y[:, 1]
+    return T, S
+
+def evaluate_noisy(model, gamma, case, p=0.0, shots=None, n=61, seed=0):
+    X, Tt = gt.test_grid(n); x = X.ravel(); t = Tt.ravel()
+    Te, Se = gt.exact(X, Tt, case, gamma)
+    T, S = noisy_expectations(model, x, t, p, shots, np.random.default_rng(seed))
+    return dict(p=p, shots=shots, relL2_T=gt.rel_l2(T.reshape(X.shape), Te), relL2_sigma=gt.rel_l2(S.reshape(X.shape), Se))
+
+if __name__ == '__main__':
+    m = q.VQC(4, 2)
+    X, Tt = gt.test_grid(21); x = X.ravel(); t = Tt.ravel()
+    T0, S0 = noisy_expectations(m, x, t)
+    with torch.no_grad():
+        T1, S1 = q.Fields(m, 9.0, 'exp').sigma(torch.as_tensor(x), torch.as_tensor(t))
+    print("density-matrix vs statevector max diff:", np.abs(T0 - T1.numpy()).max(), np.abs(S0 - S1.numpy()).max())
+    print(evaluate_noisy(m, 9.0, 'exp', p=0.01, n=21), evaluate_noisy(m, 9.0, 'exp', shots=1000, n=21))
+
+===== FILE: run_lrsel.sh =====
+#!/bin/zsh
+# Learning-rate selection by validation (never the test grid): Adam 1000, n_c 512, seed 100, grid {1e-3, 3e-3, 1e-2, 3e-2},
+# for each case, each family and configuration.  Same grid and budget for every family.
+cd "$(dirname "$0")"
+export OMP_NUM_THREADS=3
+jobs_file=logs/lrsel/jobs.txt; : > $jobs_file
+for case in exp step smooth; do
+  for lr in 1e-3 3e-3 1e-2 3e-2; do
+    for cfg in "6 4" "4 2"; do set -- ${=cfg}
+      for model in vqc mlp ff; do
+        echo "python3 qpinn_local.py run --model $model --case $case --gamma 9 --n_q $1 --L $2 --seed 100 --iters 1000 --lbfgs 0 --n_c 512 --lr $lr --tag lr$lr --out results/lrsel > logs/lrsel/${model}_${case}_q$1L$2_lr$lr.log 2>&1" >> $jobs_file
+      done
+    done
+    echo "python3 qpinn_local.py run --model mlpref --case $case --gamma 9 --n_q 6 --L 4 --seed 100 --iters 1000 --lbfgs 0 --n_c 512 --lr $lr --tag lr$lr --out results/lrsel > logs/lrsel/mlpref_${case}_lr$lr.log 2>&1" >> $jobs_file
+  done
+done
+( grep "model vqc" $jobs_file; grep -v "model vqc" $jobs_file ) | xargs -P 4 -I{} zsh -c '{}'
+echo LRSEL_DONE
+
+===== FILE: run_lrsel_hi.sh =====
+#!/bin/zsh
+# extra learning rate 1e-1 for every family (grid extension, same budget as run_lrsel.sh)
+cd "$(dirname "$0")"
+export OMP_NUM_THREADS=3
+jobs_file=logs/lrsel/jobs_hi.txt; : > $jobs_file
+for case in exp step smooth; do
+  for cfg in "6 4" "4 2"; do set -- ${=cfg}
+    for model in vqc mlp ff; do
+      echo "python3 qpinn_local.py run --model $model --case $case --gamma 9 --n_q $1 --L $2 --seed 100 --iters 1000 --lbfgs 0 --n_c 512 --lr 1e-1 --tag lr1e-1 --out results/lrsel > logs/lrsel/${model}_${case}_q$1L$2_lr1e-1.log 2>&1" >> $jobs_file
+    done
+  done
+  echo "python3 qpinn_local.py run --model mlpref --case $case --gamma 9 --n_q 6 --L 4 --seed 100 --iters 1000 --lbfgs 0 --n_c 512 --lr 1e-1 --tag lr1e-1 --out results/lrsel > logs/lrsel/mlpref_${case}_lr1e-1.log 2>&1" >> $jobs_file
+done
+( grep "model vqc" $jobs_file; grep -v "model vqc" $jobs_file ) | xargs -P 2 -I{} zsh -c '{}'
+echo LRSEL_HI_DONE
+
+===== FILE: select_lrs.py =====
+"""Pick the learning rate per (case, model, n_q, L) by validation error from results/lrsel; write results/lrsel/selected_lrs.json."""
+import json, glob, collections, sys
+rows = collections.defaultdict(dict)
+for f in [p for p in glob.glob('results/lrsel/*.json') if not p.endswith('selected_lrs.json')]:
+    r = json.load(open(f)); rows[(r['case'], r['model'], r['n_q'], r['L'])][r['lr']] = r['val']
+sel = {}
+for key in sorted(rows):
+    best = min(rows[key], key=lambda lr: rows[key][lr]); sel['%s|%s|%d|%d' % key] = best
+    print("%-6s %-6s q%dL%d  best lr %-6g  " % (key[0], key[1], key[2], key[3], best) + "  ".join("lr%g: %.3f" % (lr, rows[key][lr]) for lr in sorted(rows[key])))
+json.dump(sel, open('results/lrsel/selected_lrs.json', 'w'), indent=1); print(len(sel), "selections written")
+
+===== FILE: run_e1.sh =====
+#!/bin/zsh
+# E1 production: 3 cases x 5 seeds x {vqc 4x2, vqc 6x4, matched mlp/ff for each, mlpref}; Adam 2000 + L-BFGS 1000, n_c 512.
+cd "$(dirname "$0")"
+export OMP_NUM_THREADS=3
+jobs_file=logs/e1/jobs.txt; : > $jobs_file
+for case in exp step smooth; do
+  for seed in 0 1 2 3 4; do
+    for cfg in "6 4" "4 2"; do
+      set -- ${=cfg}
+      for model in vqc mlp ff; do
+        lr=$(python3 -c "import json;print(json.load(open('results/lrsel/selected_lrs.json'))['$case|$model|$1|$2'])")
+        echo "python3 qpinn_local.py run --model $model --case $case --gamma 9 --n_q $1 --L $2 --seed $seed --iters 2000 --lbfgs 1000 --n_c 512 --lr $lr --out results/e1 > logs/e1/${model}_${case}_q$1L$2_s$seed.log 2>&1" >> $jobs_file
+      done
+    done
+    lr=$(python3 -c "import json;print(json.load(open('results/lrsel/selected_lrs.json'))['$case|mlpref|6|4'])")
+    echo "python3 qpinn_local.py run --model mlpref --case $case --gamma 9 --n_q 6 --L 4 --seed $seed --iters 2000 --lbfgs 1000 --n_c 512 --lr $lr --out results/e1 > logs/e1/mlpref_${case}_s$seed.log 2>&1" >> $jobs_file
+  done
+done
+# VQC jobs first (slowest), 4 workers
+( grep "model vqc" $jobs_file; grep -v "model vqc" $jobs_file ) | xargs -P 4 -I{} zsh -c '{}'
+echo E1_DONE
+
+===== FILE: run_functional_matched.sh =====
+#!/bin/zsh
+# Classical nets matched to the FUNCTIONAL circuit parameter counts (30 for 4q2L, 88 for 6q4L):
+# learning-rate selection (Adam 1000, seed 100, 5-value grid) then 5 seeds with the selected rate, Adam 2000 + L-BFGS 1000.
+cd "$(dirname "$0")"
+export OMP_NUM_THREADS=2
+mkdir -p results/fmatch_lrsel results/fmatch logs/fmatch
+jobs=logs/fmatch/jobs_lrsel.txt; : > $jobs
+for case in exp step smooth; do for cfg in "6 4 88" "4 2 30"; do set -- ${=cfg}; for model in mlp ff; do for lr in 1e-3 3e-3 1e-2 3e-2 1e-1; do
+  echo "python3 qpinn_local.py run --model $model --case $case --gamma 9 --n_q $1 --L $2 --target $3 --seed 100 --iters 1000 --lbfgs 0 --n_c 512 --lr $lr --tag f$3_lr$lr --out results/fmatch_lrsel > logs/fmatch/lrsel_${model}_${case}_q$1L$2_lr$lr.log 2>&1" >> $jobs
+done; done; done; done
+xargs -P 3 -I{} zsh -c '{}' < $jobs
+python3 - <<'PY'
+import json, glob, collections
+rows = collections.defaultdict(dict)
+for f in glob.glob('results/fmatch_lrsel/*.json'):
+    r = json.load(open(f)); rows[(r['case'], r['model'], r['n_q'], r['L'])][r['lr']] = r['val']
+sel = {('%s|%s|%d|%d' % k): min(v, key=v.get) for k, v in rows.items()}
+json.dump(sel, open('results/fmatch_lrsel/selected_lrs.json', 'w'), indent=1); print(sel)
+PY
+jobs=logs/fmatch/jobs_runs.txt; : > $jobs
+for case in exp step smooth; do for cfg in "6 4 88" "4 2 30"; do set -- ${=cfg}; for model in mlp ff; do
+  lr=$(python3 -c "import json;print(json.load(open('results/fmatch_lrsel/selected_lrs.json'))['$case|$model|$1|$2'])")
+  for seed in 0 1 2 3 4; do
+    echo "python3 qpinn_local.py run --model $model --case $case --gamma 9 --n_q $1 --L $2 --target $3 --seed $seed --iters 2000 --lbfgs 1000 --n_c 512 --lr $lr --tag f$3 --out results/fmatch > logs/fmatch/run_${model}_${case}_q$1L$2_s$seed.log 2>&1" >> $jobs
+  done
+done; done; done
+xargs -P 3 -I{} zsh -c '{}' < $jobs
+echo FMATCH_DONE
+
+===== FILE: functional_count.py =====
+#!/usr/bin/env python3
+"""functional_count.py -- coordinate-perturbation audit of the circuit parameters (which parameters can affect the outputs).
+Every trainable scalar of a freshly initialised VQC (seed 0) is perturbed by an additive +0.37 in its native units (radians for rotation angles) and the two outputs are re-evaluated
+on 64 fixed random inputs (u, v ~ U(-1, 1)); a coordinate is 'inert' when max |delta y| < 1e-12.  Reports the nominal count,
+the inert count split into encoding scales and rotation angles, the functional (output-affecting) count, and the layer/qubit
+location of every inert coordinate.  Usage: python3 functional_count.py [n_q L ...]   (default: the six E3 configurations)."""
+import sys, torch, qpinn_local as q
+torch.set_default_dtype(torch.float64)
+cfgs = [(4, 2), (4, 4), (6, 2), (6, 4), (6, 8), (8, 2)]
+if len(sys.argv) > 1: cfgs = [(int(sys.argv[i]), int(sys.argv[i + 1])) for i in range(1, len(sys.argv), 2)]
+g = torch.Generator().manual_seed(12345); u = torch.rand(64, generator=g) * 2 - 1; v = torch.rand(64, generator=g) * 2 - 1
+for n_q, L in cfgs:
+    m = q.VQC(n_q, L, seed=0)
+    with torch.no_grad():
+        y0 = m(u, v).clone()
+        inert, nominal = [], 0
+        for name, p in m.named_parameters():
+            flat = p.view(-1)
+            for i in range(flat.numel()):
+                nominal += 1; old = flat[i].item(); flat[i] = old + 0.37
+                d = (m(u, v) - y0).abs().max().item(); flat[i] = old
+                if d < 1e-12: inert.append((name, i))
+    enc = [(n, i) for n, i in inert if n == 'enc']; rot = [(n, i) for n, i in inert if n == 'rot']
+    def loc(name, i):
+        if name == 'enc': l, r = divmod(i, n_q * 2); qb, k = divmod(r, 2); return 'L%d q%d %s' % (l, qb, 'a' if k == 0 else 'b')
+        if name == 'rot': l, r = divmod(i, n_q * 3); qb, k = divmod(r, 3); return 'L%d q%d theta%d' % (l, qb, k + 1)
+        return name
+    print('%dq%dL: nominal %d, inert %d (encoding %d, rotation %d), functional %d' % (n_q, L, nominal, len(inert), len(enc), len(rot), nominal - len(inert)))
+    print('   inert:', ', '.join(loc(n, i) for n, i in inert))
+
+===== FILE: family_equivalence.py =====
+"""family_equivalence.py -- output-family equivalence of the depth-2 circuits (referee round 2, finding 2.2).
+
+Claim tested: with Z readout on qubits 0 and 1 after a CZ ring, the last CZ layer is diagonal and cancels in the
+Z expectations, and the preceding CZ ring couples the measured qubits only to their ring neighbours.  For L = 2 the
+output therefore depends on the parameters of qubits {0, 1, 2, n_q - 1} only, so the 4-, 6- and 8-qubit depth-2
+circuits realise the same function family up to the relabelling {0,1,2,3} <-> {0,1,2,n_q-1}.  The test transplants
+the encoding scales, rotation angles and readout affine parameters of a 4-qubit circuit onto those qubits of a
+6- and an 8-qubit circuit (other qubits random) and compares the outputs on 64 random inputs.  L = 4 is included
+as a control: there the deeper light cone reaches every qubit and the outputs differ.
+Run from analysis/:  OMP_NUM_THREADS=2 python3 family_equivalence.py
+"""
+import sys, torch
+sys.path.insert(0, '.')
+import qpinn_local as q
+
+def transplant(src, n_q, map_q, seed):
+    dst = q.VQC(n_q, src.L, seed=seed)
+    with torch.no_grad():
+        for s_q, d_q in enumerate(map_q):
+            dst.enc[:, d_q, :] = src.enc[:, s_q, :]
+            dst.rot[:, d_q, :] = src.rot[:, s_q, :]
+        dst.out_a.copy_(src.out_a); dst.out_b.copy_(src.out_b)
+    return dst
+
+if __name__ == '__main__':
+    torch.manual_seed(0)
+    B = 64
+    u = torch.rand(B, dtype=torch.float64) * 6; v = torch.rand(B, dtype=torch.float64) * 3
+    print('family equivalence test: 64 random inputs (x in [0,6], t in [0,3]); float64/complex128 statevector')
+    for L in (2, 4):
+        src = q.VQC(4, L, seed=3)
+        with torch.no_grad():
+            src.out_a.copy_(torch.tensor([1.3, -0.7])); src.out_b.copy_(torch.tensor([0.2, 0.5]))
+            y4 = src(u, v)
+            for n_q in (6, 8):
+                dst = transplant(src, n_q, [0, 1, 2, n_q - 1], seed=11)
+                d = (dst(u, v) - y4).abs().max().item()
+                print('L=%d: 4-qubit parameters transplanted onto qubits (0,1,2,%d) of the %d-qubit circuit: max |output difference| = %.2e %s'
+                      % (L, n_q - 1, n_q, d, '(identical function family)' if d < 1e-12 else '(different: control)'))
+
+===== FILE: run_ablation_xmin.sh =====
+#!/bin/zsh
+# Ablation of the near-surface exclusion width x_min of the initial-rate terms (exp pulse, gamma 9, seed 0; otherwise the E1
+# recipe: Adam 2000 + L-BFGS 1000, N_c 512, mixed sampling, E1-selected learning rates).
+#   ./run_ablation_xmin.sh mlpref   -> MLP-ref (lr 0.01) at x_min in {0, 0.1, 0.3, 0.6, 1.0}   (run 21 Oct 2026, ~04:10)
+#   ./run_ablation_xmin.sh circuit  -> 6q4L circuit (lr 0.1) and its matched MLP (114 params, lr 0.1) at x_min in {0, 0.1}
+#                                      (run 21 Oct 2026, 07:05); their x_min = 0.3 rows are the E1 seed-0 runs (same settings).
+cd "$(dirname "$0")"; export OMP_NUM_THREADS=2; mkdir -p results/ablation logs/ablation
+run() { python3 qpinn_local.py run --model $1 --case exp --gamma 9 --n_q 6 --L 4 --seed 0 --iters 2000 --lbfgs 1000 --n_c 512 --lr $2 --ic_xmin $3 --tag xmin$3 --out results/ablation > logs/ablation/$1_xmin$3.log 2>&1 }
+case "$1" in
+  mlpref)  for x in 0.0 0.1 0.3 0.6 1.0; do run mlpref 0.01 $x; done ;;
+  circuit) run vqc 0.1 0.0 & run vqc 0.1 0.1 & run mlp 0.1 0.0 & run mlp 0.1 0.1 & wait ;;
+  *) echo "usage: $0 mlpref|circuit"; exit 1 ;;
+esac
+echo ABLATION_XMIN_DONE
+
+===== FILE: run_e3.sh =====
+#!/bin/zsh
+# Learning rates: the E1-selected exponential-pulse rates (0.1 for every VQC, MLP-matched and FF-matched cell; MLP-ref 0.01);
+# the data-only regime gets its own validation-based selection (vqc 6q4L and matched mlp, N_d 256, Adam 1000, same grid).
+# E3: (i) error vs parameter count (Pareto) on exp/gamma 9, 2 seeds: VQC configs and matched MLP/FF for each;
+#     (ii) error vs collocation count N_c in {64,256,1024,4096} (physics-only) for VQC 6x4 and matched MLP, 2 seeds;
+#     (iii) error vs labelled points N_d in {16,64,256,1024} (data-only, no PDE loss), same models, 2 seeds.
+cd "$(dirname "$0")"
+export OMP_NUM_THREADS=3
+mkdir -p results/e3 logs/e3 results/e3_lrsel_data; jobs_file=logs/e3/jobs_lrsel_data.txt; : > $jobs_file
+for lr in 1e-3 3e-3 1e-2 3e-2 1e-1; do for model in vqc mlp; do
+  echo "python3 qpinn_local.py run --model $model --case exp --gamma 9 --n_q 6 --L 4 --seed 100 --iters 1000 --lbfgs 0 --n_d 256 --regime data --lr $lr --tag datalr$lr --out results/e3_lrsel_data > logs/e3/lrsel_data_${model}_lr$lr.log 2>&1" >> $jobs_file
+done; done
+xargs -P 3 -I{} zsh -c '{}' < $jobs_file
+python3 - <<'PY'
+import json, glob, collections
+rows = collections.defaultdict(dict)
+for f in glob.glob('results/e3_lrsel_data/*.json'):
+    r = json.load(open(f)); rows[r['model']][r['lr']] = r['val']
+sel = {m: min(v, key=v.get) for m, v in rows.items()}; json.dump(sel, open('results/e3_lrsel_data/selected_lrs_data.json', 'w')); print('data-only lrs', sel)
+PY
+LR_VQC_DATA=$(python3 -c "import json;print(json.load(open('results/e3_lrsel_data/selected_lrs_data.json'))['vqc'])")
+LR_MLP_DATA=$(python3 -c "import json;print(json.load(open('results/e3_lrsel_data/selected_lrs_data.json'))['mlp'])")
+jobs_file=logs/e3/jobs.txt; : > $jobs_file
+for seed in 0 1; do
+  for cfg in "4 2" "4 4" "6 2" "6 4" "6 8" "8 2"; do set -- ${=cfg}
+    for model in vqc mlp ff; do
+      echo "python3 qpinn_local.py run --model $model --case exp --gamma 9 --n_q $1 --L $2 --seed $seed --iters 2000 --lbfgs 1000 --n_c 512 --lr 0.1 --tag pareto --out results/e3 > logs/e3/pareto_${model}_q$1L$2_s$seed.log 2>&1" >> $jobs_file
+    done
+  done
+  for nc in 64 256 1024 4096; do
+    for model in vqc mlp; do
+      echo "python3 qpinn_local.py run --model $model --case exp --gamma 9 --n_q 6 --L 4 --seed $seed --iters 2000 --lbfgs 1000 --n_c $nc --lr 0.1 --tag nc$nc --out results/e3 > logs/e3/nc${nc}_${model}_s$seed.log 2>&1" >> $jobs_file
+    done
+  done
+  for nd in 16 64 256 1024; do
+    for model in vqc mlp; do
+      echo "python3 qpinn_local.py run --model $model --case exp --gamma 9 --n_q 6 --L 4 --seed $seed --iters 2000 --lbfgs 0 --n_d $nd --regime data --lr $([ $model = vqc ] && echo $LR_VQC_DATA || echo $LR_MLP_DATA) --tag nd$nd --out results/e3 > logs/e3/nd${nd}_${model}_s$seed.log 2>&1" >> $jobs_file
+    done
+  done
+done
+( grep "model vqc" $jobs_file; grep -v "model vqc" $jobs_file ) | xargs -P ${E3_WORKERS:-3} -I{} zsh -c '{}'
+echo E3_DONE
+
+===== FILE: run_e3_aux.sh =====
+#!/bin/zsh
+# Auxiliary E3 dispatcher (v2, 21 Oct 2026 07:20; a first v2 start at 07:08 used pgrep -c, which macOS lacks, and dispatched
+# 13 jobs at once; they were killed and their logs set aside as logs/e3/aborted_*.log). History: the main run_e3.sh queue (3 workers, file order) was stopped at
+# 06:35 because the two N_c = 4096 circuit jobs would have run last; v1 of this script (xargs, 5 workers, longest first)
+# started them first, but at 07:10 they were dropped from the sweep (about 9 h per seed unloaded: Adam 2000 on 4096 points
+# plus L-BFGS on 16384 points) and killing them made BSD xargs abort its queue.  v2 is a plain loop: it runs every job line
+# of logs/e3/jobs.txt whose log file does not exist (= not started), longest first, keeping the number of E3 circuit
+# processes (including jobs started earlier that are still running) at the value in logs/e3/aux_workers (default 4,
+# editable while running), then waits for every E3 process to end and stamps E3_DONE into logs/e3_run.out.
+# Job lines, learning rates and outputs are exactly those of logs/e3/jobs.txt (written by run_e3.sh).
+cd "$(dirname "$0")"
+export OMP_NUM_THREADS=2
+jobs_file=logs/e3/jobs.txt; aux=logs/e3/jobs_aux.txt; wfile=logs/e3/aux_workers
+[[ -f $wfile ]] || echo 4 > $wfile
+python3 - "$jobs_file" "$aux" <<'PY'
+import re, os, sys
+src, dst = sys.argv[1], sys.argv[2]
+def cost(line):
+    model = re.search(r'--model (\w+)', line).group(1)
+    nq = int(re.search(r'--n_q (\d+)', line).group(1)); L = int(re.search(r'--L (\d+)', line).group(1))
+    nc = re.search(r'--n_c (\d+)', line); nc = int(nc.group(1)) if nc else 0
+    if model != 'vqc': return 1
+    if '--regime data' in line: return 10
+    return (2 ** nq) * L * (nc + 100) / 1000
+rows = []
+for line in open(src):
+    line = line.rstrip('\n')
+    if not line: continue
+    log = re.search(r'> (logs/e3/\S+\.log)', line).group(1)
+    if os.path.exists(log): continue
+    rows.append((cost(line), line))
+rows.sort(key=lambda r: -r[0])
+open(dst, 'w').write('\n'.join(r[1] for r in rows) + '\n')
+print('aux jobs:', len(rows))
+for c, l in rows: print('%7.1f  %s' % (c, l.split('run ')[1].split(' --out')[0]))
+PY
+pat='[Pp]ython[^ ]* qpinn_local.py run .*--out results/e3'
+jobs=("${(@f)$(cat $aux)}")
+i=1
+while (( i <= ${#jobs} )); do
+  n=$(cat $wfile 2>/dev/null || echo 4); running=$(pgrep -f "$pat" | wc -l | tr -d " ")
+  if (( running < n )); then
+    echo "$(date '+%H:%M') start [$i/${#jobs}] ${jobs[i]%% > *}" | sed 's/python3 qpinn_local.py run //'
+    zsh -c "${jobs[i]}" &
+    (( i++ )); sleep 3
+  else
+    sleep 30
+  fi
+done
+wait
+while pgrep -f "$pat" > /dev/null; do sleep 60; done
+echo "E3 aux finished $(date): $(ls results/e3/*.json | wc -l | tr -d ' ') of $(grep -c . $jobs_file) results (the two VQC N_c = 4096 jobs were dropped)" >> logs/e3_run.out
+echo E3_DONE >> logs/e3_run.out
+
+===== FILE: run_gamma.sh =====
+#!/bin/zsh
+# Secondary wave speeds gamma in {25, 49}: VQC 6x4, matched MLP and FF, MLP-ref, exp pulse, 3 seeds; learning rates = the E1-selected exp-pulse rates (0.1; MLP-ref 0.01).
+cd "$(dirname "$0")"
+export OMP_NUM_THREADS=3
+mkdir -p results/gamma logs/gamma; jobs_file=logs/gamma/jobs.txt; : > $jobs_file
+for g in 25 49; do for seed in 0 1 2; do for model in vqc mlp ff mlpref; do
+  echo "python3 qpinn_local.py run --model $model --case exp --gamma $g --n_q 6 --L 4 --seed $seed --iters 2000 --lbfgs 1000 --n_c 512 --lr $([ $model = mlpref ] && echo 0.01 || echo 0.1) --out results/gamma > logs/gamma/${model}_g${g}_s$seed.log 2>&1" >> $jobs_file
+done; done; done
+( grep "model vqc" $jobs_file; grep -v "model vqc" $jobs_file ) | xargs -P ${G_WORKERS:-3} -I{} zsh -c '{}'
+echo GAMMA_DONE
+
+===== FILE: run_e4.py =====
+"""E4: evaluate trained VQC models (best two seeds per case/config from results/e1, plus results/gamma) under finite shots
+and per-layer single-qubit depolarising noise.  Inference only; exact density-matrix simulation; 41 x 40 subgrid.
+Writes results/e4_noise.json."""
+import sys, os, json, glob, collections, torch, numpy as np; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import qpinn_local as q, noise_eval as ne
+cands = collections.defaultdict(list)
+for pt in sorted(glob.glob('results/e1/vqc_*.pt') + glob.glob('results/gamma/vqc_*.pt')):
+    meta = json.load(open(pt[:-3] + '.json')); cands[(meta['case'], meta['gamma'], meta['n_q'], meta['L'])].append((meta['relL2_sigma'], pt, meta))
+rows = []
+for key, lst in sorted(cands.items()):
+    for _, pt, meta in sorted(lst, key=lambda z: z[0])[:2]:
+        m = q.VQC(meta['n_q'], meta['L']); m.load_state_dict(torch.load(pt)); m.eval()
+        base = dict(name=meta['name'], case=meta['case'], gamma=meta['gamma'], seed=meta['seed'], n_q=meta['n_q'], L=meta['L'],
+                    clean_T=meta['relL2_T'], clean_sigma=meta['relL2_sigma'])
+        for p in (0.0, 1e-3, 1e-2):
+            for shots in (None, 1000, 10000, 100000):
+                pass
+                r = ne.evaluate_noisy(m, meta['gamma'], meta['case'], p=p, shots=shots, n=41, seed=meta['seed'])
+                rows.append(dict(base, **r)); print(meta['name'], p, shots, "T %.4f sigma %.4f" % (r['relL2_T'], r['relL2_sigma']), flush=True)
+        json.dump(rows, open('results/e4_noise.json', 'w'), indent=1)
+print("E4_DONE", len(rows))
+
+===== FILE: make_results_package.py =====
+"""make_results_package.py -- aggregate results/{e1,fmatch,ablation,e3,gamma}/*.json, results/e2_exp_g9.json, results/e4_noise.json
+into tables (markdown + csv) and figures (pdf) under ../paper/results_package/.  Robust to missing pieces."""
+import os, sys, glob, json, math, collections
+import numpy as np
+HERE = os.path.dirname(os.path.abspath(__file__)); OUT = os.path.join(HERE, '..', 'paper', 'results_package'); FIG = os.path.join(OUT, 'figures')
+os.makedirs(FIG, exist_ok=True)
+sys.path.insert(0, HERE); sys.path.insert(0, os.path.join(HERE, '..', 'chatgpt_pro_job', 'inputs'))
+import matplotlib; matplotlib.use('Agg'); import matplotlib.pyplot as plt
+plt.rcParams.update({'font.size': 10, 'axes.linewidth': 0.6, 'lines.linewidth': 1.3, 'figure.dpi': 150, 'pdf.fonttype': 42, 'legend.fontsize': 8, 'axes.labelsize': 10, 'xtick.labelsize': 9, 'ytick.labelsize': 9})
+COL = {'vqc': 'tab:red', 'mlp': 'tab:blue', 'ff': 'tab:green', 'mlpref': 'k'}
+LAB = {'vqc': 'QPINN (VQC)', 'mlp': 'MLP-matched', 'ff': 'FF-matched', 'mlpref': 'MLP-ref'}
+
+def load(pattern):
+    rows = []
+    for f in sorted(glob.glob(os.path.join(HERE, pattern))):
+        try: rows.append(json.load(open(f)))
+        except Exception as e: print('skip', f, e)
+    return rows
+
+def msd(v):
+    v = np.asarray(v, float); return (v.mean(), v.std(ddof=1) if len(v) > 1 else 0.0, len(v))
+
+lines = ["# Results package (auto-generated by make_results_package.py)\n"]
+# ---------------- E1
+e1 = load('results/e1/*.json')
+if e1:
+    lines.append("## E1: parity at matched parameter count (physics-only, gamma = 9, five seeds)\n")
+    lines.append("| case | model | config | params | lr | T relL2 mean +- sd | sigma relL2 mean +- sd | best-seed sigma | train s |\n|---|---|---|---|---|---|---|---|---|")
+    groups = collections.defaultdict(list)
+    for r in e1: groups[(r['case'], r['model'], r['n_q'], r['L'])].append(r)
+    csv = ["case,model,n_q,L,params,lr,T_mean,T_sd,sigma_mean,sigma_sd,n_seeds,sigma_best,train_s_mean"]
+    for key in sorted(groups, key=lambda k: (k[0], k[2] * 10 + k[3], k[1])):
+        rs = groups[key]; cfg = 'q%dL%d' % (key[2], key[3]) if key[1] != 'mlpref' else '-'
+        Tm, Ts, n = msd([r['relL2_T'] for r in rs]); Sm, Ss, _ = msd([r['relL2_sigma'] for r in rs])
+        lines.append("| %s | %s | %s | %d | %g | %.4f +- %.4f | %.4f +- %.4f | %.4f | %.0f |" % (key[0], LAB[key[1]], cfg, rs[0]['n_params'], rs[0]['lr'], Tm, Ts, Sm, Ss, min(r['relL2_sigma'] for r in rs), np.mean([r['train_s'] for r in rs])))
+        csv.append("%s,%s,%d,%d,%d,%g,%.6f,%.6f,%.6f,%.6f,%d,%.6f,%.1f" % (key[0], key[1], key[2], key[3], rs[0]['n_params'], rs[0]['lr'], Tm, Ts, Sm, Ss, n, min(r['relL2_sigma'] for r in rs), np.mean([r['train_s'] for r in rs])))
+    open(os.path.join(OUT, 'table_e1.csv'), 'w').write('\n'.join(csv) + '\n')
+    # figure: bar chart sigma error per case/model
+    fig, axes = plt.subplots(1, 2, figsize=(7.2, 3.2))
+    for ax, field in zip(axes, ['relL2_T', 'relL2_sigma']):
+        cases = ['exp', 'step', 'smooth']; keys = [('vqc', 6, 4), ('mlp', 6, 4), ('ff', 6, 4), ('vqc', 4, 2), ('mlp', 4, 2), ('ff', 4, 2), ('mlpref', 6, 4)]
+        w = 0.11
+        for j, (mdl, nq, L) in enumerate(keys):
+            ms = []; ss = []
+            for c in cases:
+                rs = groups.get((c, mdl, nq, L), []); m, s, _ = msd([r[field] for r in rs]) if rs else (np.nan, 0, 0); ms.append(m); ss.append(s)
+            hatch = '' if (L == 4 or mdl == 'mlpref') else '////'
+            ax.bar(np.arange(3) + (j - 3) * w, ms, w, yerr=ss, color=COL[mdl], edgecolor='k', linewidth=0.4, hatch=hatch,
+                   label='%s %s' % (LAB[mdl], ('q%dL%d' % (nq, L)) if mdl != 'mlpref' else ''), capsize=1.5, error_kw=dict(lw=0.6))
+        ax.set_xticks(range(3)); ax.set_xticklabels(cases); ax.set_yscale('log'); ax.set_ylabel('relative L2 error, ' + ('T' if field == 'relL2_T' else r'$\sigma$'))
+    h, l = axes[1].get_legend_handles_labels(); fig.legend(h, l, fontsize=8, ncol=4, frameon=False, loc='lower center', bbox_to_anchor=(0.5, -0.02))
+    fig.tight_layout(rect=(0, 0.12, 1, 1)); fig.savefig(os.path.join(FIG, 'fig_e1_errors.pdf'), bbox_inches='tight'); plt.close(fig)
+# ---------------- E3 Pareto / efficiency
+e3 = [] if os.environ.get('SKIP_PENDING') else load('results/e3/*.json')
+FUNC = {(4, 2): 30, (4, 4): 70, (6, 2): 30, (6, 4): 88, (6, 8): 208, (8, 2): 30}   # output-affecting circuit parameters (functional_parameter_counts.md)
+if e3:
+    lines.append("\n## E3: efficiency (exp pulse, gamma = 9, seeds 0 and 1; nominal = registered parameter count, functional = output-affecting count of the circuit; classical nets are nearest-count matches to the circuit's nominal count, deviation given in percent; lr 0.1 for every physics-only cell)\n")
+    par = [r for r in e3 if r.get('name', '').endswith('_pareto')]
+    if par:
+        lines.append("### Error versus parameter count (physics-only, N_c = 512 per Adam step, Adam 2000 + L-BFGS 1000 on 2048 fixed points)\n| model | config | nominal params | functional / deviation from target | T relL2 mean | sigma relL2 mean | T per seed | sigma per seed | train s mean |\n|---|---|---|---|---|---|---|---|---|")
+        g = collections.defaultdict(list)
+        for r in par: g[(r['model'], r['n_q'], r['L'])].append(r)
+        fig, ax = plt.subplots(figsize=(3.4, 2.6))
+        for key in sorted(g, key=lambda k: (k[1] * 10 + k[2], k[0])):
+            rs = sorted(g[key], key=lambda r: r['seed']); nq, L = key[1], key[2]
+            if key[0] == 'vqc': extra = '%d functional' % FUNC[(nq, L)]
+            else:
+                tgt = rs[0].get('target_params') or 0
+                extra = ('%+.1f%% vs %d' % (100.0 * (rs[0]['n_params'] - tgt) / tgt, tgt)) if tgt else '-'
+            lines.append("| %s | q%dL%d | %d | %s | %.4f | %.4f | %s | %s | %.0f |" % (LAB[key[0]], nq, L, rs[0]['n_params'], extra, np.mean([r['relL2_T'] for r in rs]), np.mean([r['relL2_sigma'] for r in rs]), ', '.join('%.4f' % r['relL2_T'] for r in rs), ', '.join('%.4f' % r['relL2_sigma'] for r in rs), np.mean([r['train_s'] for r in rs])))
+        for mdl in ('vqc', 'mlp', 'ff'):
+            pts = sorted([(g[k][0]['n_params'], np.mean([r['relL2_sigma'] for r in g[k]])) for k in g if k[0] == mdl])
+            if pts: ax.plot(*zip(*pts), 'o-', color=COL[mdl], label=LAB[mdl] + (' (nominal)' if mdl == 'vqc' else ''), ms=3)
+        ptsf = sorted([(FUNC[(k[1], k[2])], np.mean([r['relL2_sigma'] for r in g[k]])) for k in g if k[0] == 'vqc'])
+        if ptsf: ax.plot(*zip(*ptsf), 's', color=COL['vqc'], mfc='none', label='QPINN (functional)', ms=4)
+        ax.set_xscale('log'); ax.set_yscale('log'); ax.set_xlabel('trainable parameters'); ax.set_ylabel(r'relative L2 error, $\sigma$'); ax.legend(fontsize=7, frameon=False)
+        fig.tight_layout(); fig.savefig(os.path.join(FIG, 'fig_e3_pareto.pdf')); plt.close(fig)
+    for tagpref, xlab, fname, note in [('nc', 'collocation points per Adam step', 'fig_e3_colloc.pdf', 'physics-only, VQC 6q4L and its nominal-matched MLP; L-BFGS 1000 on a fixed set of 4 N_c points; Adam 2000; lr 0.1'),
+                                       ('nd', 'labelled exact samples (data-only)', 'fig_e3_data.pdf', 'MSE on N_d exact samples drawn once per run, no PDE loss, Adam 2000 only, no L-BFGS; lr 0.03 (VQC), 0.1 (MLP), both selected by validation in this regime')]:
+        sub = [r for r in e3 if ('_' + tagpref) in r.get('name', '') and 'pareto' not in r.get('name', '')]
+        if tagpref == 'nc':   # the N_c = 512 point of the collocation sweep is the Pareto/E1 run of the same configuration
+            sub += [dict(r, name=r['name'].replace('_pareto', '_nc512')) for r in e3 if r.get('name', '').endswith('_pareto') and r['model'] in ('vqc', 'mlp') and r['n_q'] == 6 and r['L'] == 4]
+        if sub:
+            lines.append("\n### Error versus %s (%s)\n| model | %s | T relL2 mean | sigma relL2 mean | T per seed | sigma per seed | train s mean |\n|---|---|---|---|---|---|---|" % (xlab, note, tagpref.upper()))
+            g = collections.defaultdict(list)
+            for r in sub: g[(r['model'], int(r['name'].split('_' + tagpref)[-1]))].append(r)
+            fig, ax = plt.subplots(figsize=(3.4, 2.6))
+            for mdl in ('vqc', 'mlp'):
+                for k in sorted(g):
+                    if k[0] == mdl:
+                        rs = sorted(g[k], key=lambda r: r['seed'])
+                        lines.append("| %s | %d | %.4f | %.4f | %s | %s | %.0f |" % (LAB[mdl], k[1], np.mean([r['relL2_T'] for r in rs]), np.mean([r['relL2_sigma'] for r in rs]), ', '.join('%.4f' % r['relL2_T'] for r in rs), ', '.join('%.4f' % r['relL2_sigma'] for r in rs), np.mean([r['train_s'] for r in rs])))
+                pts = sorted([(k[1], np.mean([r['relL2_sigma'] for r in g[k]])) for k in g if k[0] == mdl])
+                if pts: ax.plot(*zip(*pts), 'o-', color=COL[mdl], label=LAB[mdl], ms=3)
+            ax.set_xscale('log'); ax.set_yscale('log'); ax.set_xlabel(xlab); ax.set_ylabel(r'relative L2 error, $\sigma$'); ax.legend(fontsize=7, frameon=False)
+            fig.tight_layout(); fig.savefig(os.path.join(FIG, fname)); plt.close(fig)
+# ---------------- functional-matched classical nets
+fm = load('results/fmatch/*.json')
+if fm:
+    lines.append("\n## E1b: classical nets matched to the circuits' FUNCTIONAL parameter counts (30 for 4q2L, 88 for 6q4L; learning rates selected per cell by validation; five seeds; same recipe as E1)\n")
+    lines.append("| case | model | matched to | params | lr | T relL2 mean +- sd | sigma relL2 mean +- sd | best-seed sigma |\n|---|---|---|---|---|---|---|---|")
+    g = collections.defaultdict(list)
+    for r in fm: g[(r['case'], r['model'], r['n_q'], r['L'])].append(r)
+    for key in sorted(g, key=lambda k: (k[0], k[2] * 10 + k[3], k[1])):
+        rs = g[key]; Tm, Ts, n = msd([r['relL2_T'] for r in rs]); Sm, Ss, _ = msd([r['relL2_sigma'] for r in rs])
+        lines.append("| %s | %s | q%dL%d functional (%d) | %d | %g | %.4f +- %.4f | %.4f +- %.4f | %.4f |" % (key[0], LAB[key[1]], key[2], key[3], rs[0]['target_params'], rs[0]['n_params'], rs[0]['lr'], Tm, Ts, Sm, Ss, min(r['relL2_sigma'] for r in rs)))
+# ---------------- near-surface exclusion ablation
+ab = load('results/ablation/*.json')
+if ab:
+    models = {r['model'] for r in ab}
+    for r in e1:   # the x_min = 0.3 rows of the circuit and the matched MLP are their E1 seed-0 runs (identical settings)
+        if r['case'] == 'exp' and r['seed'] == 0 and r['n_q'] == 6 and r['L'] == 4 and r['model'] in models and r['model'] != 'mlpref': ab.append(r)
+    lines.append("\n## Ablation: near-surface exclusion width x_min of the initial-rate condition (exp pulse, gamma 9, seed 0, E1 recipe, N_c 512, E1-selected learning rates; the x_min = 0.3 rows of the circuit and the matched MLP are their E1 seed-0 runs)\n| model | params | lr | x_min | T relL2 | sigma relL2 |\n|---|---|---|---|---|---|")
+    order = {'mlpref': 0, 'vqc': 1, 'mlp': 2, 'ff': 3}
+    for r in sorted(ab, key=lambda r: (order[r['model']], r['ic_xmin'])):
+        lines.append("| %s | %d | %g | %g | %.4f | %.4f |" % (LAB[r['model']], r['n_params'], r['lr'], r['ic_xmin'], r['relL2_T'], r['relL2_sigma']))
+# ---------------- gamma
+gm = [] if os.environ.get('SKIP_PENDING') else load('results/gamma/*.json')
+if gm:
+    lines.append("\n## Secondary wave speeds (exp pulse, three seeds; VQC 6q4L, nominal-matched MLP and FF, MLP-ref; E1 recipe with the gamma-9 exp-pulse rates: 0.1, MLP-ref 0.01)\n| gamma | model | params | lr | T relL2 mean +- sd | sigma relL2 mean +- sd | T per seed | sigma per seed | train s mean |\n|---|---|---|---|---|---|---|---|---|")
+    g = collections.defaultdict(list)
+    for r in gm: g[(r['gamma'], r['model'])].append(r)
+    for key in sorted(g):
+        rs = sorted(g[key], key=lambda r: r['seed']); Tm, Ts, _ = msd([r['relL2_T'] for r in rs]); Sm, Ss, _ = msd([r['relL2_sigma'] for r in rs])
+        lines.append("| %g | %s | %d | %g | %.4f +- %.4f | %.4f +- %.4f | %s | %s | %.0f |" % (key[0], LAB[key[1]], rs[0]['n_params'], rs[0]['lr'], Tm, Ts, Sm, Ss, ', '.join('%.4f' % r['relL2_T'] for r in rs), ', '.join('%.4f' % r['relL2_sigma'] for r in rs), np.mean([r['train_s'] for r in rs])))
+# ---------------- E2
+e2p = os.path.join(HERE, 'results', 'e2_exp_g9.json')
+if os.path.exists(e2p):
+    e2 = json.load(open(e2p))
+    lines.append("\n## E2: gradient variance at random initialisation (exp pulse, gamma = 9, 200 initialisations, first-layer RY angle on qubit 0)\n")
+    lines.append("| L | loss | " + " | ".join("n_q=%d" % n for n in range(2, 11)) + " | fitted slope d log10 Var / d n_q |\n|---|---|" + "---|" * 10)
+    fig, axes = plt.subplots(1, 3, figsize=(7.2, 2.9), sharey=True)
+    for ax, L in zip(axes, (2, 4, 8)):
+        for lt, c, mk, ls in zip(('data', 'physics', 'combined'), ('tab:blue', 'tab:red', 'tab:purple'), ('o', 's', '^'), ('-', '-', '--')):
+            rs = sorted([r for r in e2 if r['L'] == L and r['loss'] == lt], key=lambda r: r['n_q'])
+            if not rs: continue
+            nq = np.array([r['n_q'] for r in rs]); var = np.array([r['var'] for r in rs])
+            slope = np.polyfit(nq, np.log10(var), 1)[0] if len(nq) > 2 else float('nan')
+            lines.append("| %d | %s | " % (L, lt) + " | ".join("%.2e" % r['var'] for r in rs) + " | %.3f |" % slope)
+            ax.semilogy(nq, var, marker=mk, linestyle=ls, color=c, label=lt, ms=4, mfc='none' if lt == 'combined' else c)
+        ax.set_title('L = %d' % L); ax.set_xlabel('qubits $n_q$'); ax.set_xticks(range(2, 11))
+    axes[0].set_ylabel(r'Var$[\partial \mathcal{L}/\partial\theta]$'); axes[0].legend(frameon=False); fig.tight_layout(); fig.savefig(os.path.join(FIG, 'fig_e2_gradvar.pdf')); plt.close(fig)
+# ---------------- E4
+e4p = os.path.join(HERE, 'results', 'e4_noise.json')
+if os.path.exists(e4p):
+    e4 = json.load(open(e4p))
+    lines.append("\n## E4: inference under finite shots and depolarising noise (best two seeds per case, gamma and configuration; 41 x 40 subgrid; per-layer single-qubit depolarising p, binomial shot sampling of each <Z_k>; rows with p = 0 and shots = exact are the clean same-grid controls)\n| case | gamma | config | p | shots | T relL2 mean +- sd | sigma relL2 mean +- sd | n |\n|---|---|---|---|---|---|---|---|")
+    g = collections.defaultdict(list)
+    for r in e4: g[(r['case'], r['gamma'], r['n_q'], r['L'], r['p'], r['shots'] or 0)].append(r)
+    for key in sorted(g, key=lambda k: (k[0], k[1], k[2], k[3], k[4], k[5])):
+        rs = g[key]; Tm, Ts, n = msd([r['relL2_T'] for r in rs]); Sm, Ss, _ = msd([r['relL2_sigma'] for r in rs])
+        lines.append("| %s | %g | q%dL%d | %g | %s | %.4f +- %.4f | %.4f +- %.4f | %d |" % (key[0], key[1], key[2], key[3], key[4], key[5] or 'exact', Tm, Ts, Sm, Ss, n))
+# ---------------- field plots for the best E1 models (exp case)
+try:
+    import torch, qpinn_local as q, ground_truth as gt
+    X, Tt = gt.test_grid(121); Te, Se = gt.exact(X, Tt, 'exp', 9.0)
+    best = {}
+    for r in e1:
+        if r['case'] == 'exp' and r['model'] in ('vqc', 'mlp', 'mlpref') and (r['model'] == 'mlpref' or (r['n_q'], r['L']) == (6, 4)):
+            if r['model'] not in best or r['relL2_sigma'] < best[r['model']]['relL2_sigma']: best[r['model']] = r
+    if best:
+        fig, axes = plt.subplots(2, 1 + len(best), figsize=(6.6, 3.7), sharex=True, sharey=True); ims = [None, None]
+        for ax in axes.ravel(): ax.tick_params(labelsize=7)
+        for i, (name, fld) in enumerate([('exact', (Te, Se))] + [(k, None) for k in ('vqc', 'mlp', 'mlpref') if k in best]):
+            if fld is None:
+                r = best[name]; m = q.make_model(name, r['n_q'], r['L'], target=r.get('target_params', 124), seed=r['seed'])
+                m.load_state_dict(torch.load(os.path.join(HERE, 'results', 'e1', r['name'] + '.pt')))
+                with torch.no_grad(): T, S = q.Fields(m, 9.0, 'exp').sigma(torch.as_tensor(X.ravel()), torch.as_tensor(Tt.ravel()))
+                fld = (T.numpy().reshape(X.shape), S.numpy().reshape(X.shape)); title = '%s\n($\\sigma$ err %.1f%%)' % (LAB[name], 100 * r['relL2_sigma'])
+            else: title = 'exact'
+            for row, (F, vmin, vmax) in enumerate([(fld[0], 0, 0.22), (fld[1], -1.0, 0.6)]):
+                im = axes[row, i].pcolormesh(Tt, X, F, vmin=vmin, vmax=vmax, cmap='RdBu_r' if row else 'inferno', shading='auto', rasterized=True)
+                ims[row] = im
+                axes[row, i].set_title(title if row == 0 else '', fontsize=8)
+            axes[1, i].set_xlabel('t', fontsize=8)
+        axes[0, 0].set_ylabel('x  (T)', fontsize=8); axes[1, 0].set_ylabel(r'x  ($\sigma$)', fontsize=8); fig.tight_layout()
+        for row, lab in enumerate(['T', r'$\sigma$']):
+            cb = fig.colorbar(ims[row], ax=list(axes[row, :]), fraction=0.025, pad=0.02); cb.set_label(lab, fontsize=8); cb.ax.tick_params(labelsize=7)
+        fig.savefig(os.path.join(FIG, 'fig_fields_exp.pdf'), bbox_inches='tight'); plt.close(fig)
+except Exception as e:
+    print('field plots skipped:', e)
+open(os.path.join(OUT, 'results_tables.md'), 'w').write('\n'.join(lines) + '\n')
+print('\n'.join(lines)); print('figures:', sorted(os.listdir(FIG)))
+
+===== FILE: make_runs_all.py =====
+#!/usr/bin/env python3
+"""make_runs_all.py -- collect every per-run record (results/*/*.json written by qpinn_local.py run) into
+../paper/results_package/runs_all.json: a list of dicts with an added 'experiment' key; 'hist' (Adam checkpoints every
+500 steps and the L-BFGS closure count) is kept.  Learning-rate selection runs are included (experiment lrsel*)."""
+import json, glob, os, collections
+HERE = os.path.dirname(os.path.abspath(__file__)); OUT = os.path.join(HERE, '..', 'paper', 'results_package')
+SETS = [('e1', 'results/e1/*.json'), ('fmatch', 'results/fmatch/*.json'), ('ablation_xmin', 'results/ablation/*.json'), ('ablation_repro', 'results/ablation_repro/*.json'),
+        ('e3', 'results/e3/*.json'), ('gamma', 'results/gamma/*.json'), ('lrsel', 'results/lrsel/*.json'),
+        ('lrsel_fmatch', 'results/fmatch_lrsel/*.json'), ('lrsel_e3_data', 'results/e3_lrsel_data/*.json')]
+rows = []
+for exp, pat in SETS:
+    for f in sorted(glob.glob(os.path.join(HERE, pat))):
+        if os.path.basename(f).startswith('selected_lrs'): continue
+        if os.environ.get('SKIP_PENDING') and exp in ('e3', 'gamma'): continue   # sweeps still running: not released yet
+        r = json.load(open(f)); r['experiment'] = exp; r['file'] = os.path.relpath(f, HERE); rows.append(r)
+json.dump(rows, open(os.path.join(OUT, 'runs_all.json'), 'w'))
+print(len(rows), 'records:', dict(collections.Counter(r['experiment'] for r in rows)))
+
+===== FILE: make_code_bundle.sh =====
+#!/bin/zsh
+# Concatenate the analysis code into ../paper/results_package/code_bundle.txt (one text file for review and upload).
+cd "$(dirname "$0")"
+set -e
+# ground_truth.py lives in ../chatgpt_pro_job/inputs/ in the working tree and next to this script in the release archive.
+if [ -f ../chatgpt_pro_job/inputs/ground_truth.py ]; then GT=../chatgpt_pro_job/inputs/ground_truth.py; else GT=ground_truth.py; fi
+mkdir -p ../paper/results_package
+out=../paper/results_package/code_bundle.txt
+{
+  echo "# Code bundle for reproduction (QPINN-LTE-2026-10-20), regenerated $(date '+%Y-%m-%d %H:%M %Z'). Each file is delimited by '===== FILE: name ====='."
+  echo "# ground_truth.py is the exact-solution module imported by qpinn_local.py (kept in chatgpt_pro_job/inputs/ in the working tree; next to the scripts in the release archive)."
+  for f in qpinn_local.py $GT noise_eval.py run_lrsel.sh run_lrsel_hi.sh select_lrs.py run_e1.sh \
+           run_functional_matched.sh functional_count.py family_equivalence.py run_ablation_xmin.sh run_e3.sh run_e3_aux.sh run_gamma.sh run_e4.py make_results_package.py \
+           make_runs_all.py make_code_bundle.sh closed_form_corrected.py laplace_ref.py fd_ref.py check_corrected.py; do
+    if [ ! -f "$f" ]; then echo "make_code_bundle.sh: missing input $f" >&2; exit 1; fi
+    echo; echo "===== FILE: $(basename $f) ====="; cat "$f"
+  done
+} > $out
+wc -c $out
+
+===== FILE: closed_form_corrected.py =====
+"""Re-derived closed-form solutions (Laplace transform, residues + standard erfc tables) for
+    T_t = T_xx + e^{-x} f(t),  T_x(0,t)=0,  T(x,0)=0
+    sigma_xx - (1/gamma) sigma_tt = T_tt,  sigma(0,t)=0,  sigma(x,0) = 0 and sigma_t(x,0+) = -gamma e^{-x} f(0+)
+    (the impulsive launch of the stress wave; equivalently w = sigma + gamma T has w = w_t = 0 at t = 0)
+with f = Ae e^{-beta t} (exponential pulse) or f = As [H(t) - H(t-Delta)] (step pulse).
+Transform-domain solution (a = sqrt(gamma), tau = x/a):
+    T^ = fh [ e^{-x}/(s-1) - e^{-sqrt(s) x}/(sqrt(s)(s-1)) ]
+    S^ = fh [ A(s)(e^{-x} - e^{-s tau}) - B(s)(e^{-sqrt(s) x} - e^{-s tau}) ],
+    A = gamma s^2/((s-1)(gamma-s^2)),  B = gamma sqrt(s)/((s-1)(gamma-s)).
+All exponentially growing pieces are regrouped so that only bounded erfcx/erfc terms remain."""
+import numpy as np
+from scipy.special import erfc, erfcx, dawsn
+
+def _xi(x, t):
+    return x / (2.0 * np.sqrt(t))
+
+def _Eerfcx(xi, u):
+    """Stable e^{-xi^2} erfcx(u) for real u of either sign (erfcx(-u) = 2 e^{u^2} - erfcx(u));
+    valid whenever e^{u^2 - xi^2} is bounded, which holds for every use below."""
+    u = np.asarray(u, float)
+    direct = np.exp(-xi**2) * erfcx(np.where(u >= 0, u, 0.0))
+    alt = 2.0 * np.exp(u**2 - xi**2) - np.exp(-xi**2) * erfcx(np.where(u < 0, -u, 0.0))
+    return np.where(u >= 0, direct, alt)
+
+def T_exp(x, t, beta, Ae=1.0):
+    """Corrected eq. (11).  Differs from the printed one only in the sign of the argument of the
+    second erfc: erfc((2t - x)/(2 sqrt t)) instead of erfc((x - 2t)/(2 sqrt t))."""
+    x = np.asarray(x, float); t = np.asarray(t, float)
+    xi = _xi(x, t); E = np.exp(-xi**2); eta = np.sqrt(beta * t)
+    val = (0.5 * _Eerfcx(xi, np.sqrt(t) - xi) + 0.5 * E * erfcx(xi + np.sqrt(t))
+           - np.exp(-x - beta * t)
+           - E * np.imag(erfcx(xi + 1j * eta)) / np.sqrt(beta)) / (1.0 + beta)
+    return Ae * val
+
+def _U_T(x, t):
+    """Unit-step (continuous heating, f = H(t)) temperature."""
+    xi = _xi(x, t); E = np.exp(-xi**2)
+    return (-np.exp(-x) + 0.5 * _Eerfcx(xi, np.sqrt(t) - xi) + 0.5 * E * erfcx(xi + np.sqrt(t))
+            + 2.0 * np.sqrt(t / np.pi) * E - x * erfc(xi))
+
+def T_step(x, t, As, Delta):
+    x = np.asarray(x, float); t = np.asarray(t, float)
+    out = As * _U_T(x, t)
+    m = t > Delta
+    if np.any(m):
+        out = np.where(m, out - As * _U_T(x, np.where(m, t - Delta, 1.0)), out)
+    return out
+
+def _sigma_unit(x, t, beta, gamma):
+    """Stress for f = e^{-beta t} (beta = 0 gives the unit-step response)."""
+    x = np.asarray(x, float); t = np.asarray(t, float)
+    a = np.sqrt(gamma); xi = _xi(x, t); E = np.exp(-xi**2); st = np.sqrt(t)
+    c1 = gamma / ((gamma - 1) * (1 + beta))
+    c2 = gamma / ((gamma - 1) * (gamma + beta))
+    c3 = -gamma / ((1 + beta) * (gamma + beta))
+    r_a = -gamma * a / (2 * (a - 1) * (a + beta))
+    r_ma = gamma * a / (2 * (a + 1) * (a - beta))
+    r_b = gamma * beta**2 / ((1 + beta) * (beta**2 - gamma))
+    tau = x / a; H = (t > tau); tm = np.where(H, t - tau, 1.0)   # tm only used where H
+    spt = np.sqrt(np.pi * t); sptm = np.sqrt(np.pi * tm)
+    # group p = 1
+    g1 = c1 * (-E / spt + 0.5 * E * erfcx(xi + st) + 0.5 * _Eerfcx(xi, st - xi)
+               + np.where(H, 1.0 / sptm - erfcx(np.sqrt(tm)), 0.0))
+    # group p = gamma
+    ahead = c2 * (E / spt - 0.5 * a * E * erfcx(xi + a * st) + 0.5 * a * _Eerfcx(xi, xi - a * st))
+    behind = c2 * (E / spt - 0.5 * a * E * erfcx(xi + a * st) - 0.5 * a * _Eerfcx(xi, a * st - xi)
+                   + a * erfcx(a * np.sqrt(tm)) - 1.0 / sptm)
+    g2 = np.where(H, behind, ahead)
+    # group p = -beta
+    eta = np.sqrt(beta * t); etam = np.sqrt(beta * tm)
+    g3 = (-c3 * E / spt - c3 * np.sqrt(beta) * E * np.imag(erfcx(xi + 1j * eta))
+          + r_b * np.exp(-beta * t - x)
+          + np.where(H, c3 / sptm - c3 * np.sqrt(beta) * (2 / np.sqrt(np.pi)) * dawsn(etam)
+                     - r_b * np.exp(-beta * tm), 0.0))
+    # +-a exponentials
+    g4 = r_a * np.exp(a * t - x) * (~H) + r_ma * (np.exp(-a * t - x) - np.where(H, np.exp(x - a * t), 0.0))
+    return g1 + g2 + g3 + g4
+
+def sigma_exp(x, t, beta, gamma, Ae=1.0):
+    return Ae * _sigma_unit(x, t, beta, gamma)
+
+def sigma_step(x, t, As, Delta, gamma):
+    x = np.asarray(x, float); t = np.asarray(t, float)
+    out = As * _sigma_unit(x, t, 0.0, gamma)
+    m = t > Delta
+    if np.any(m):
+        out = np.where(m, out - As * _sigma_unit(x, np.where(m, t - Delta, 1.0), 0.0, gamma), out)
+    return out
+
+===== FILE: laplace_ref.py =====
+"""Independent reference: numerical inverse Laplace transform (mpmath) of the exact transform-domain solution.
+T^(x,s) = fhat(s) [ e^{-x}/(s-1) - e^{-sqrt(s) x}/(sqrt(s)(s-1)) ]          (T_x(0,t)=0, bounded)
+sigma^ = s^2 C1 (e^{-x} - e^{-k x})/(1-k^2) + s^2 C2 (e^{-sqrt(s) x} - e^{-k x})/(s-k^2),  k = s/sqrt(gamma)
+with C1 = fhat/(s-1), C2 = -fhat/(sqrt(s)(s-1));  sigma(0,t)=0 (free surface), zero initial data."""
+import mpmath as mp
+
+def That(x, s, fhat):
+    return fhat(s) * (mp.e**(-x) / (s - 1) - mp.e**(-mp.sqrt(s) * x) / (mp.sqrt(s) * (s - 1)))
+
+def Shat(x, s, fhat, gamma):
+    k = s / mp.sqrt(gamma)
+    C1 = fhat(s) / (s - 1)
+    C2 = -fhat(s) / (mp.sqrt(s) * (s - 1))
+    return (s**2 * C1 * (mp.e**(-x) - mp.e**(-k * x)) / (1 - k**2)
+            + s**2 * C2 * (mp.e**(-mp.sqrt(s) * x) - mp.e**(-k * x)) / (s - k**2))
+
+def invert(Fs, t, method='talbot', dps=30):
+    mp.mp.dps = dps
+    return mp.invertlaplace(Fs, t, method=method)
+
+def T_exp_ref(x, t, beta, Ae=1.0, **kw):
+    fhat = lambda s: Ae / (s + beta)
+    return float(invert(lambda s: That(mp.mpf(x), s, fhat), mp.mpf(t), **kw))
+
+def sigma_exp_ref(x, t, beta, gamma, Ae=1.0, **kw):
+    fhat = lambda s: Ae / (s + beta)
+    return float(invert(lambda s: Shat(mp.mpf(x), s, fhat, mp.mpf(gamma)), mp.mpf(t), **kw))
+
+def _unit_step(x, t, gamma, which, **kw):
+    fhat = lambda s: 1 / s
+    if which == 'T':
+        return float(invert(lambda s: That(mp.mpf(x), s, fhat), mp.mpf(t), **kw))
+    return float(invert(lambda s: Shat(mp.mpf(x), s, fhat, mp.mpf(gamma)), mp.mpf(t), **kw))
+
+def T_step_ref(x, t, As, Delta, **kw):
+    v = As * _unit_step(x, t, None, 'T', **kw)
+    if t > Delta:
+        v -= As * _unit_step(x, t - Delta, None, 'T', **kw)
+    return v
+
+def sigma_step_ref(x, t, As, Delta, gamma, **kw):
+    v = As * _unit_step(x, t, gamma, 'S', **kw)
+    if t > Delta:
+        v -= As * _unit_step(x, t - Delta, gamma, 'S', **kw)
+    return v
+
+===== FILE: fd_ref.py =====
+"""Independent reference 2: method-of-lines finite differences (RK4) for the coupled system,
+using w = sigma + gamma*T so that T_tt never appears:  T_t = T_xx + e^{-x} f,  w_tt = gamma (w - gamma T)_xx.
+BCs: T_x(0,t)=0, w(0,t)=gamma*T(0,t) (free surface sigma=0), far field zero.
+ICs: T=w=w_t=0.  (w = sigma + gamma*T is the scaled elastic strain; u_t = 0 at t=0 gives w_t(x,0+) = 0, which is NOT a zero stress rate:
+ i.e. sigma_t(x,0+) = -gamma e^{-x} f(0+), the same jump the 0- Laplace transform of T_tt produces.)"""
+import numpy as np
+
+def solve(f, f0, gamma, L=24.0, N=1200, t_end=3.0, t_out=None, cfl=0.2):
+    x = np.linspace(0.0, L, N + 1); dx = x[1] - x[0]
+    dt = cfl * dx**2
+    nsteps = int(np.ceil(t_end / dt)); dt = t_end / nsteps
+    ex = np.exp(-x)
+    T = np.zeros(N + 1); w = np.zeros(N + 1); p = np.zeros(N + 1)
+
+    def rhs(t, T, w, p):
+        Txx = np.zeros_like(T)
+        Txx[1:-1] = (T[2:] - 2 * T[1:-1] + T[:-2]) / dx**2
+        Txx[0] = 2 * (T[1] - T[0]) / dx**2
+        dT = Txx + ex * f(t); dT[-1] = 0.0
+        w = w.copy(); w[0] = gamma * T[0]; w[-1] = 0.0
+        wxx = np.zeros_like(w)
+        wxx[1:-1] = (w[2:] - 2 * w[1:-1] + w[:-2]) / dx**2
+        dp = gamma * wxx - gamma**2 * Txx; dp[0] = 0.0; dp[-1] = 0.0
+        dw = p.copy(); dw[0] = gamma * dT[0]; dw[-1] = 0.0
+        return dT, dw, dp
+
+    t = 0.0; out = {}
+    t_out = sorted(t_out or [])
+    k_out = {int(round(tt / dt)): tt for tt in t_out}
+    for n in range(nsteps):
+        k1 = rhs(t, T, w, p)
+        k2 = rhs(t + dt/2, T + dt/2*k1[0], w + dt/2*k1[1], p + dt/2*k1[2])
+        k3 = rhs(t + dt/2, T + dt/2*k2[0], w + dt/2*k2[1], p + dt/2*k2[2])
+        k4 = rhs(t + dt, T + dt*k3[0], w + dt*k3[1], p + dt*k3[2])
+        T = T + dt/6*(k1[0] + 2*k2[0] + 2*k3[0] + k4[0])
+        w = w + dt/6*(k1[1] + 2*k2[1] + 2*k3[1] + k4[1])
+        p = p + dt/6*(k1[2] + 2*k2[2] + 2*k3[2] + k4[2])
+        w[0] = gamma * T[0]; w[-1] = 0.0; T[-1] = 0.0
+        t += dt
+        if (n + 1) in k_out:
+            out[k_out[n + 1]] = (T.copy(), (w - gamma * T).copy())
+    return x, out
+
+===== FILE: check_corrected.py =====
+import sys, numpy as np, time
+sys.path.insert(0, '.')
+import closed_form_corrected as cc, laplace_ref as lr, fd_ref as fd
+beta, gamma, Ae, As, Delta = 2.0, 9.0, 1.0, 1.0, 0.5
+print("=== corrected closed form vs inverse Laplace (dehoog) and FD, exponential pulse (beta=2, gamma=9) ===")
+t_out = [0.1, 0.3, 0.75, 1.5, 2.5]
+t0 = time.time(); xg, out = fd.solve(lambda t: Ae*np.exp(-beta*t), Ae, gamma, N=2400, t_end=2.5, t_out=t_out); print("FD N=2400: %.1fs" % (time.time()-t0))
+maxT = maxS = 0.0
+for t in t_out:
+    T, S = out[t]
+    for x in [0.1, 0.5, 1.1, 2.1, 4.1]:
+        i = int(round(x / (xg[1]-xg[0])))
+        Tc = float(cc.T_exp(x, t, beta, Ae)); Sc = float(cc.sigma_exp(x, t, beta, gamma, Ae))
+        Tl = lr.T_exp_ref(x, t, beta, Ae, method='dehoog'); Sl = lr.sigma_exp_ref(x, t, beta, gamma, Ae, method='dehoog')
+        maxT = max(maxT, abs(Tc-T[i])); maxS = max(maxS, abs(Sc-S[i]))
+        print("t=%-5g x=%-4g | T: closed=%-11.7g lap=%-11.7g fd=%-11.7g | sig: closed=%-11.7g lap=%-11.7g fd=%-11.7g" % (t, x, Tc, Tl, T[i], Sc, Sl, S[i]))
+print("max |closed - FD|: T %.2e  sigma %.2e" % (maxT, maxS))
+print("\n=== step pulse (As=1, Delta=0.5, gamma=9) ===")
+xg, out = fd.solve(lambda t: As*(1.0 if t < Delta else 0.0), As, gamma, N=2400, t_end=2.5, t_out=t_out)
+maxT = maxS = 0.0
+for t in t_out:
+    T, S = out[t]
+    for x in [0.1, 0.5, 1.1, 2.1, 4.1]:
+        i = int(round(x / (xg[1]-xg[0])))
+        Tc = float(cc.T_step(x, t, As, Delta)); Sc = float(cc.sigma_step(x, t, As, Delta, gamma))
+        Tl = lr.T_step_ref(x, t, As, Delta, method='dehoog'); Sl = lr.sigma_step_ref(x, t, As, Delta, gamma, method='dehoog')
+        maxT = max(maxT, abs(Tc-T[i])); maxS = max(maxS, abs(Sc-S[i]))
+        print("t=%-5g x=%-4g | T: closed=%-11.7g lap=%-11.7g fd=%-11.7g | sig: closed=%-11.7g lap=%-11.7g fd=%-11.7g" % (t, x, Tc, Tl, T[i], Sc, Sl, S[i]))
+print("max |closed - FD|: T %.2e  sigma %.2e" % (maxT, maxS))
+print("\n=== large gamma robustness (gamma=100, beta=2): finite values? ===")
+for t in [0.05, 0.5, 2.0, 5.0]:
+    v = cc.sigma_exp(np.array([0.0, 0.1, 1.0, 5.0, 20.0]), t, beta, 100.0)
+    print("t=%g:" % t, np.array2string(np.asarray(v), precision=5))
+
+print("\n=== smooth pulse (A (e^{-2t} - e^{-8t}), A = 4/3) by superposition vs direct de Hoog inversion, gamma = 9 ===")
+import mpmath as mp
+fh = lambda s: (4.0/3.0) * (1/(s+2.0) - 1/(s+8.0))
+mx = 0.0
+for (x, t) in [(0.1, 0.1), (1.1, 0.75), (2.1, 1.5), (0.5, 2.5), (4.1, 2.5)]:
+    Tl = float(lr.invert(lambda s: lr.That(mp.mpf(x), s, fh), mp.mpf(t), method='dehoog'))
+    Sl = float(lr.invert(lambda s: lr.Shat(mp.mpf(x), s, fh, mp.mpf(9.0)), mp.mpf(t), method='dehoog'))
+    Tc = float(cc.T_exp(x, t, 2.0, 4/3) - cc.T_exp(x, t, 8.0, 4/3)); Sc = float(cc.sigma_exp(x, t, 2.0, 9.0, 4/3) - cc.sigma_exp(x, t, 8.0, 9.0, 4/3))
+    mx = max(mx, abs(Tc - Tl), abs(Sc - Sl))
+    print("x=%-4g t=%-5g | T: closed=%-12.8g lap=%-12.8g | sigma: closed=%-12.8g lap=%-12.8g" % (x, t, Tc, Tl, Sc, Sl))
+print("max |closed - inversion| over the 5 smooth-pulse points: %.2e" % mx)
