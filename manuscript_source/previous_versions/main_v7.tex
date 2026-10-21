@@ -1,0 +1,1435 @@
+% Manuscript v7 (final): repository address inserted; author block and declarations confirmed by the author on 21 Oct 2026; otherwise identical to v6, the version verified in referee rounds 4 and 5.
+\documentclass[11pt]{article}
+%TC:envir table 0 1
+%TC:envir tabular 1 1
+%TC:envir longtable 1 1
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[margin=25mm]{geometry}
+\usepackage{amsmath,amssymb,graphicx,booktabs,longtable,array}
+\usepackage[authoryear,round]{natbib}
+\usepackage[hidelinks]{hyperref}
+\usepackage{url,placeins}
+\setlength{\emergencystretch}{2em}
+\newcommand{\dd}{\mathrm d}
+\DeclareMathOperator{\Var}{Var}
+\DeclareMathOperator{\erf}{erf}
+\DeclareMathOperator{\erfc}{erfc}
+\DeclareMathOperator{\erfi}{erfi}
+\DeclareMathOperator{\erfcx}{erfcx}
+
+%TC:ignore
+\title{Quantum and classical physics-informed networks for laser-pulse
+thermoelasticity: nominal and output-affecting parameter comparisons}
+\author{Hussain Al-Qahtani\thanks{Corresponding author:
+\href{mailto:ahtanih@kfupm.edu.sa}{ahtanih@kfupm.edu.sa}.}\\
+\small Department of Mechanical Engineering,\\
+\small King Fahd University of Petroleum and Minerals,\\
+\small Dhahran 31261, Saudi Arabia}
+\date{}
+%TC:endignore
+\begin{document}
+%TC:ignore
+\maketitle
+%TC:endignore
+
+\begin{abstract}
+Laser-pulse heating couples thermal diffusion to elastic-wave propagation,
+providing a demanding test of physics-informed learning. We compare quantum
+and classical networks against corrected exact thermoelastic fields, using
+internally prespecified research questions and protocol, with execution
+changes disclosed. Under the executed recipe, the classical multilayer
+perceptron has lower mean temperature and stress errors in every nominal-count
+and output-affecting-count comparison (Tables~\ref{tab:e1} and \ref{tab:e1b}).
+The larger circuit takes 171.7--228.3 times the nominally matched network's
+recorded CPU runtime (Table~\ref{tab:e1}). The full physics objective raises
+one selected gradient variance, but finite-range and tail slopes establish
+neither asymptotic decay nor barren-plateau mitigation
+(Table~\ref{tab:e2summary}; Supplementary Table~S9).
+Across the tested parameter and collocation budgets and the production
+training-label sweep conditional on separately tuned hyperparameters,
+the circuit shows no stress-efficiency advantage over the multilayer perceptron
+(Table~\ref{tab:e3}). Supervision lowers the circuit's attainable stress
+error but leaves a classical accuracy gap (Table~\ref{tab:e3}).
+Secondary wave speeds preserve the circuit--perceptron ordering
+(Table~\ref{tab:gamma}). Common-grid inference controls show greater stress
+degradation at the lowest shot budget than under either tested
+exact-expectation depolarizing channel (Table~\ref{tab:e4ratios}); trained
+readout gains amplify sampling fluctuations. The shared initial-rate
+exclusion leaves part of the continuum stress evolution to model-dependent
+implicit selection. Together with limited replication of the efficiency
+sweeps and contention-affected timings, this restricts the comparison to
+the declared recipe. The study establishes no quantum advantage.
+\end{abstract}
+
+\section*{Highlights}
+\begin{itemize}
+\item Nominal and output-affecting count comparisons favor the classical MLP.
+\item No tested production-budget stress comparison favors the circuit over the MLP.
+\item Finite-range gradient slopes do not establish asymptotic decay.
+\item Trained readout gains amplify finite-shot inference errors.
+\item Initial-rate exclusions leave part of the stress evolution unconstrained.
+\end{itemize}
+\noindent\textbf{Keywords:} physics-informed neural networks; quantum machine
+learning; laser heating; thermoelasticity; gradient variance; readout noise.
+
+\section{Introduction}
+
+Laser absorption produces localized heating, constrained thermal expansion,
+and propagating stress. Predicting these coupled fields supports pulse
+selection for laser processing, thermal-stress control, and interpretation
+of thermal barrier coating tests. The semi-infinite pulse-heating model of
+\citet{AlQahtani2026} offers an exact-reference benchmark for this purpose.
+Its simplicity is deliberate: a homogeneous half-space cannot predict
+coating-interface failure, plasticity, or material removal. More elaborate
+thermoelastic descriptions include non-Fourier transport and strain
+feedback \citep{WangXu2001}; the present benchmark isolates Fourier
+conduction and one-way thermal forcing of a stress wave.
+
+Physics-informed neural networks (PINNs) approximate fields while penalizing
+equation and boundary residuals \citep{Raissi2019}. Thermal-mechanical
+learning for laser metal deposition provides an application precedent
+\citep{Sharma2024}. Accurate stresses, rather than an aggregate training
+loss alone, matter in such applications. Exact fields permit separate
+assessment of temperature, stress, and computational expense without
+uncertainty from a learned reference.
+
+Differentiable quantum circuits can solve differential equations
+\citep{Kyriienko2021}; repeated data encoding enlarges their function
+representation \citep{PerezSalinas2020}. Quantum and hybrid PINNs have been
+compared with classical networks \citep{Trahan2024}. In particular,
+\citet{Berger2025} report favorable comparisons using trainable classical
+embeddings and equal parameter counts. Heat-equation and parabolic-PDE
+studies \citep{Dehaghani2025,Tran2026}, adaptive loss weighting
+\citep{Setty2025}, and a recent embedding comparison
+\citep{TranEmbedding2026} establish substantial prior work. A quantum
+physics-informed graph-network proposal for laser cutting also exists
+\citep{Ruhi2023}. The contribution here is a controlled thermoelastic
+benchmark, not a new general quantum-PINN method or a broad priority claim
+for laser heating.
+
+Trainability and prediction accuracy are separate questions. Barren-plateau
+results depend on circuit ensembles, depth, cost locality, and noise
+\citep{McClean2018,Cerezo2021,WangNoise2021}. A PDE-based mitigation proposal
+uses qubit-indexed finite-difference field values \citep{Ukwatta2026}; our
+coordinate-encoded circuit instead differentiates fixed observable
+readouts. Consequently, its gradient diagnostic does not directly test
+that proposal's representation or locality argument. Increasing a loss's
+scale also increases gradient variance without establishing improved
+trainability.
+
+Classical controls are essential to a meaningful quantum comparison
+\citep{Bowles2024}. Encoding-dependent Fourier representations
+\citep{Schuld2021}, classical surrogates of trained quantum models
+\citep{Schreiber2023}, and sufficient conditions for random-feature
+dequantization \citep{Sahebi2025} motivate a spectral comparator. Here it is
+an independently trained classical spectral baseline motivated by
+dequantization results, with no claim to reproduce the circuit's learned
+frequencies or function.
+
+The internal brief asks:
+\begin{enumerate}
+\item \textbf{RQ1:} Does a quantum PINN match a classical PINN with the same
+parameter count on these fields?
+\item \textbf{RQ2:} Does the physics PDE-residual loss change barren-plateau
+behavior, measured through gradient variance versus qubit count and depth,
+compared with a data loss?
+\item \textbf{RQ3:} Is the quantum PINN more parameter-efficient or
+data-efficient?
+\end{enumerate}
+The brief supplies no directional statistical hypotheses, equivalence
+margin, or decision rule. We therefore answer descriptively, without
+retrospective confirmatory hypotheses. For RQ2, the executed statistic uses
+the full physics objective, including boundary and initial-rate terms.
+For RQ3, the label comparison concerns production training labels
+conditional on separately selected hyperparameters, not total exact-label
+acquisition (Section~3.3).
+The study follows internally prespecified research questions and protocol,
+with the execution changes disclosed in Supplementary Section~S1.
+Its contributions are:
+\begin{itemize}
+\item replicated compact-model comparisons on coupled heat--stress fields,
+with nominal and output-affecting parameter accounting;
+\item corrected closed forms checked by inverse-Laplace evaluation and an
+independent finite-difference formulation;
+\item characterization of readout-gain amplification in selected trained
+thermoelastic circuits, using common-grid clean and noisy controls.
+\end{itemize}
+The general link between observable coefficients and sampling variance,
+including variance regularization, has prior precedent
+\citep{Kreplin2024}. The contribution is its measured manifestation here.
+
+\section{Problem statement and exact solution}
+
+\subsection{Physical assumptions and dimensional conversion}
+
+Consider a homogeneous isotropic half-space with constant coefficients,
+Beer--Lambert absorption, an insulated traction-free surface, and
+uniaxial strain. Let $X,\tau,\Theta,u,\Sigma$ denote dimensional depth,
+time, temperature rise, displacement, and tensile-positive axial stress.
+The constitutive law and momentum balance are \citep{WangXu2001}
+\begin{align}
+ \Sigma&=M u_X-b_{\rm th}\Theta,&
+ \rho u_{\tau\tau}&=\Sigma_X,\\
+ M&=\lambda+2\mu=\rho c_{\rm el}^2,&
+ b_{\rm th}&=\frac{E\alpha_T}{1-2\nu}.
+\end{align}
+Here $\alpha_T$ is the linear expansion coefficient. Eliminating $u$ gives
+\begin{equation}
+ \Sigma_{XX}-c_{\rm el}^{-2}\Sigma_{\tau\tau}
+ =c_2\Theta_{\tau\tau},\qquad
+ c_2=\frac{b_{\rm th}}{c_{\rm el}^2},\qquad
+ [c_2]=\mathrm{Pa\,s^2\,m^{-2}\,K^{-1}}.
+ \label{eq:dimensional}
+\end{equation}
+The coefficient $b_{\rm th}/(\rho c_{\rm el}^2)=b_{\rm th}/M$, with units
+$\mathrm{K^{-1}}$, belongs to the displacement equation multiplying
+$\Theta_X$; it is not the coefficient in Eq.~\eqref{eq:dimensional}.
+
+With absorption coefficient $\delta$, conductivity $k$, absorbed intensity
+$I_1$, and thermal diffusivity $\alpha_{\rm th}=k/(\rho c_p)$, define
+\begin{equation}
+ x=\delta X,\quad t=\alpha_{\rm th}\delta^2\tau,\quad
+ \Theta_*=\frac{I_1}{k\delta},\quad T=\frac{\Theta}{\Theta_*},\quad
+ \gamma=\frac{c_{\rm el}^2}{\alpha_{\rm th}^2\delta^2}.
+\end{equation}
+The original stress scale is
+$\Sigma_0=I_1c_2c_{\rm el}^2/(k\delta)=b_{\rm th}\Theta_*$.
+The benchmark uses $\sigma=\gamma\Sigma/\Sigma_0$, giving the explicit
+conversion
+\begin{equation}
+ \boxed{\Sigma\,[\mathrm{Pa}]=
+ \frac{E\alpha_T I_1}{(1-2\nu)\gamma k\delta}\,\sigma .}
+ \label{eq:pascal}
+\end{equation}
+Dimensional material and pulse scales must be supplied before interpreting
+a predicted stress in pascals. All fields and coordinates below are
+dimensionless; runtimes are in seconds.
+
+The benchmark equations and complete physical initial data are
+\begin{align}
+ T_t-T_{xx}&=e^{-x}f(t),&
+ \sigma_{xx}-\gamma^{-1}\sigma_{tt}&=T_{tt},\label{eq:pdes}\\
+ T_x(0,t)&=0,&\sigma(0,t)&=0,\\
+ T,\sigma&\longrightarrow0\quad(x\longrightarrow\infty),&
+ T(x,0)&=\sigma(x,0)=0,\\
+ T_t(x,0^+)&=e^{-x}f(0^+),&
+ \sigma_t(x,0^+)&=-\gamma e^{-x}f(0^+),\quad x>0.
+ \label{eq:rates}
+\end{align}
+The stress rate follows from initially zero material velocity and the
+constitutive law. The heat equation has no strain feedback. Phase change,
+plasticity, ablation, interfaces, and temperature-dependent properties
+are excluded.
+
+\subsection{Pulses, reference fields, and interfaces}
+
+Table~\ref{tab:problem} defines the pulses and domain. Appendix~\ref{app:exact}
+gives the corrected closed forms implemented in \path{ground_truth.py}.
+Inverse-Laplace evaluation \citep{deHoog1982} and an independently
+discretized evolution problem check these fields; Supplementary
+Section~S7 provides the executed verification records and their limits.
+
+\begin{table}[htbp]
+\centering
+\caption{Problem and evaluation settings from the executed benchmark.
+$H$ denotes the Heaviside function; the pulses are causal.
+Energy is $E_0=\int_0^\infty f(t)\,\dd t$.}
+\label{tab:problem}
+\begin{tabular}{p{0.22\linewidth}p{0.68\linewidth}}
+\toprule
+Item & Definition or value \\
+\midrule
+Exponential & $f(t)=A_e e^{-\beta t}$, $A_e=1$, $\beta=2$, $E_0=0.5$ \\
+Rectangular (step) & $f(t)=A_s[H(t)-H(t-\Delta)]$,
+$A_s=1$, $\Delta=0.5$, $E_0=0.5$ \\
+Smooth & $f(t)=A(e^{-\beta_1t}-e^{-\beta_2t})$,
+$A=4/3$, $\beta_1=2$, $\beta_2=8$, $E_0=0.5$ \\
+Main material ratio & $\gamma=9$; dimensionless wave speed $\sqrt\gamma=3$ \\
+Network domain & $x\in[0,6]$, $t\in[0,3]$ \\
+Test grid & $241$ spatial nodes on $[0,6]$ and $240$ time nodes on $(0,3]$ \\
+E1/E1b replication & Seeds $0,1,2,3,4$ in each cell; $105$ E1 and $60$ E1b runs \\
+E3 & Exponential pulse, $\gamma=9$; seeds $0,1$; $66$ completed runs \\
+Secondary wave speeds & Exponential pulse, $\gamma=25,49$;
+seeds $0,1,2$; $24$ runs \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Sudden startup launches a derivative discontinuity along
+$x=\sqrt\gamma\,t$. The smooth pulse cancels its leading startup kink.
+The rectangular pulse also has a temporal interface. At fixed interior
+$x$, away from intersection with the pre-existing characteristic, define
+$[g]_\Delta=g(x,\Delta^+)-g(x,\Delta^-)$; then
+\begin{equation}
+ [T]_\Delta=[\sigma]_\Delta=0,\qquad
+ [T_t]_\Delta=-A_s e^{-x},\qquad
+ [\sigma_t]_\Delta=\gamma A_s e^{-x}.
+ \label{eq:jumps}
+\end{equation}
+These conditions follow from the heat equation and the distributional
+stress equation; $w=\sigma+\gamma T$ and $w_t$ remain continuous.
+The interface $t=\Delta$ differs from the delayed surface characteristic
+$x=\sqrt\gamma(t-\Delta)$. The executed objective has no explicit
+interface penalty; sampled smooth residuals alone do not certify these
+jump conditions.
+
+\subsection{Truncation and supplied information}
+
+At the outer boundary in Table~\ref{tab:problem}, exact Dirichlet traces
+for both fields restrict the half-space solution without an additional
+artificial-boundary approximation. Every physics-trained model receives these traces.
+``Physics-only'' therefore means no interior training labels; exact
+boundary values and separate exact validation labels are still supplied.
+The fully prescribed reference problem and the relaxed training
+constraints in Section~3.2 must be distinguished.
+The data-only E3 sweep varies the production training-label count $N_d$
+conditional on separately selected hyperparameters. Its axis excludes
+exact labels used for tuning and validation diagnostics; Section~3.3 and
+Table~\ref{tab:training} account for that additional information.
+
+\section{Models and training}
+
+\subsection{Circuit and classical comparators}
+
+Inputs are $u=x/3-1$ and $v=2t/3-1$ for the domain in
+Table~\ref{tab:problem}. Starting from $|0\cdots0\rangle$, each circuit
+layer applies on each qubit
+\begin{equation}
+ G_{\ell q}=R_Z(\theta_{3,\ell q})R_Y(\theta_{2,\ell q})
+ R_Z(\theta_{1,\ell q})R_X(b_{\ell q}v)R_Y(a_{\ell q}u),
+ \label{eq:gate}
+\end{equation}
+with the rightmost gate first, followed by the CZ ring. From the released
+code, the ring has a single edge for the smallest diagnostic circuit;
+Table~\ref{tab:models} records the convention and initializations. Outputs are
+\begin{equation}
+ y_k=\alpha_k\langle Z_k\rangle+\beta_k,\quad k\in\{0,1\},\qquad
+ P_{\rm nom}=5n_qL+4.
+ \label{eq:readout}
+\end{equation}
+Training uses exact statevectors and automatic differentiation through
+complex arithmetic, including the higher-order graphs needed to
+differentiate second-order residuals with respect to parameters.
+
+\begin{table}[htbp]
+\centering\small
+\caption{Architectures and initialization from the released code and
+executed coordinate-perturbation audit. $P_{\rm out}$ counts
+output-affecting coordinates, not proven independent functional dimension.
+Fixed spectral frequencies are not trainable parameters.}
+\label{tab:models}
+\begin{tabular}{p{0.23\linewidth}p{0.67\linewidth}}
+\toprule
+Item & Definition \\
+\midrule
+Circuit & $(n_q,L)=(4,2),(6,4)$;
+$P_{\rm nom}/P_{\rm out}=44/30,124/88$ \\
+Initialization & $a,b\sim\mathcal N(0,1)$;
+$\theta_j\sim\mathcal U(0,2\pi)$; $\alpha_k=1$, $\beta_k=0$ \\
+CZ ring & Edges $(q,q+1\bmod n_q)$ for $n_q>2$;
+one edge $(0,1)$ for $n_q=2$ \\
+MLP & $2\to h\to h\to2$, tanh;
+$P=h^2+6h+2$. E1: $h=4,8$, $P=42,114$;
+E1b: $h=3,7$, $P=29,93$ \\
+Spectral & $z=[u,v]B$, $B\in\mathbb R^{2\times8}$,
+$B_{ij}\sim\mathcal N(0,\pi^2)$ fixed;
+$[\cos z,\sin z]\to h\to2$, tanh, no phase;
+$P=19h+2$. E1: $h=2,6$, $P=40,116$;
+E1b: $h=2,5$, $P=40,97$ \\
+Reference MLP & $2\to64\to64\to64\to64\to2$, tanh;
+$P=12802$ \\
+Classical initialization & PyTorch \texttt{Linear} defaults after setting
+the run seed; $P_{\rm out}=P_{\rm nom}$ denotes no structurally removed
+coordinates, not a rank measurement \\
+Matching & Nearest count; prescribed tolerance $\pm10\%$;
+all deviations reported, including exceptions \\
+Coordinate audit & Model seed $0$; input seed $12345$;
+$64$ uniform inputs in $[-1,1]^2$; additive perturbation $+0.37$
+per scalar; inert if maximum output change is below $10^{-12}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The terminal CZ ring commutes with the readouts; final-layer operations
+on unmeasured qubits and terminal measured-qubit $R_Z$ rotations cannot
+affect them. Backward causal structure removes further coordinates.
+The released \path{functional_count.py} and its executed audit list the
+inert coordinates underlying Table~\ref{tab:models}; Supplementary
+Section~S2 extends the accounting to every E3 circuit. These counts do not
+measure Jacobian rank or rule out dependencies among the remaining
+coordinates. The perturbation is an angle increment only for rotation
+coordinates, since encoding scales and affine readout parameters are also
+tested.
+
+E1 compares registered counts; E1b retunes classical networks toward the
+circuit's output-affecting counts. The smaller spectral row repeats E1
+and is not an output-count match. Its minimum is imposed by the implemented
+width search, not the architecture; the larger spectral row also slightly
+exceeds the prescribed tolerance (Table~\ref{tab:e1b}). The reference MLP
+is an attainable-accuracy control. Equal counts do not imply equal
+capacity, derivative cost, memory, or optimization work.
+
+\subsection{Hard initial fields and physics objective}
+
+Every family uses
+\begin{equation}
+ T_\vartheta=t y_0(u,v;\vartheta),\qquad
+ \sigma_\vartheta=t y_1(u,v;\vartheta).
+ \label{eq:ansatz}
+\end{equation}
+This enforces initial fields, but leaves their initial rates trainable.
+Writing $\langle\cdot\rangle_C,\langle\cdot\rangle_B,
+\langle\cdot\rangle_I$ for sample means over collocation points, shared
+boundary times, and retained initial-rate locations, the released code uses
+\begin{align}
+ r_h&=T_{\vartheta,t}-T_{\vartheta,xx}-e^{-x}f(t),&
+ r_s&=\sigma_{\vartheta,xx}-\gamma^{-1}\sigma_{\vartheta,tt}
+       -T_{\vartheta,tt},\\
+ \mathcal L_h&=\langle r_h^2\rangle_C,&
+ \mathcal L_s&=\langle r_s^2\rangle_C,\\
+ \mathcal L_B&=\langle T_{\vartheta,x}(0,t)^2\rangle_B
+ +\langle\sigma_\vartheta(0,t)^2\rangle_B\notag\\
+ &\quad+\langle[T_\vartheta(6,t)-T^*(6,t)]^2\rangle_B
+ +\langle[\sigma_\vartheta(6,t)-\sigma^*(6,t)]^2\rangle_B,\\
+ \mathcal L_I&=\langle[y_0(x,0)-e^{-x}f(0^+)]^2\rangle_I
+ +\left\langle\left[\frac{y_1(x,0)+\gamma e^{-x}f(0^+)}\gamma
+ \right]^2\right\rangle_I,\\
+ \mathcal L_P&=\mathcal L_h+\mathcal L_s+\mathcal L_B
+ +\lambda_I\mathcal L_I.\label{eq:loss}
+\end{align}
+In the rate terms, $y_k(x,0)$ abbreviates evaluation at the corresponding
+scaled coordinates. A star denotes an exact field. All weights and
+reductions are specified in Table~\ref{tab:training}; no adaptive weighting
+is used. Adaptive weighting has been studied in quantum differential
+equation solvers \citep{Setty2025} and is a distinct future comparison.
+
+\begin{table}[htbp]
+\centering
+\caption{Sampling, training, and validation settings from the execution
+record and released code for the reference physics recipe. E3 changes
+point budgets and, for data-only training, the objective and optimizer
+schedule (Table~\ref{tab:e3}). Exponential-distribution parameters are
+means. Boundary counts denote shared time samples for all boundary terms.}
+\label{tab:training}
+\begin{tabular}{p{0.27\linewidth}p{0.63\linewidth}}
+\toprule
+Item & Executed setting \\
+\midrule
+Adam stage & $2000$ steps; $N_c=512$ resampled collocation points per step;
+$128$ boundary times sampled with replacement from $4096$ precomputed
+exact far-boundary values \\
+Collocation mixture & Half uniform on $[0,6]\times[10^{-3},3]$;
+half with $x\sim\mathrm{Exp}(\text{mean }1)$ clipped to $[0,6]$
+and $t\sim\mathrm{Exp}(\text{mean }0.7)$ clipped to $[10^{-3},3]$ \\
+Initial-rate locations & Collocation $x$ values retained for $x\ge0.3$,
+then evaluated at $t=0$ \\
+Loss weights & Each PDE and boundary component has weight $1$;
+$\lambda_I=1$ in all physics runs, including E2 \\
+Adam schedule & Cosine decay to $5\%$ of the initial learning rate \\
+L-BFGS stage & Configured limits: $1000$ iterations, $1250$ evaluations;
+optimizer step size $1$; strong-Wolfe line search; history $50$;
+gradient tolerance $10^{-12}$; change tolerance $10^{-14}$;
+fixed $2048$ collocation points and $512$ shared boundary times \\
+Rate candidates & $\{10^{-3},3\times10^{-3},10^{-2},3\times10^{-2},10^{-1}\}$ \\
+Rate selection & $1000$ Adam steps per candidate, seed $100$;
+$2000$ fixed random validation points; score $e_T+e_\sigma$;
+never the test grid \\
+Selection grouping & Independently for each pulse, family, and configuration \\
+E3 data-only tuning & Rates selected once at $N_d=256$: $256$ exact
+training samples and $2000$ exact validation samples shared by the
+$5$ candidate rates and both families; seed $100$ \\
+E3 production validation & Diagnostics only; no parameter updates,
+early stopping, or checkpoint selection \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The stress equation requires an initial rate. For nonzero-start pulses,
+its interior right limit conflicts with the differentiated free-surface
+condition at the initial corner. Excluding an interval, however, is
+stronger than excluding that point. The executed cutoff in
+Table~\ref{tab:training} omits $45.12\%$ of the squared nonzero initial-rate
+profile on the truncated domain, since
+\begin{equation}
+ \frac{\int_0^{x_{\min}}e^{-2x}\,\dd x}
+ {\int_0^{6}e^{-2x}\,\dd x}
+ =\frac{1-e^{-2x_{\min}}}{1-e^{-12}}.
+\end{equation}
+This is a squared-profile fraction, not mechanical energy.
+
+The retained continuum constraints do not uniquely determine stress.
+Choose a smooth nonzero $g$ supported inside $(0,x_{\min})$ and add a
+homogeneous wave $v$ satisfying
+\begin{equation}
+ v_{tt}=\gamma v_{xx},\quad v(x,0)=0,\quad v_t(x,0)=g(x),\quad
+ v(0,t)=v(6,t)=0.
+\end{equation}
+It preserves the PDE, stress boundaries, zero initial stress, and every
+retained rate condition. This function-space argument does not assert
+multiple exact zero-loss realizations in a finite neural architecture.
+It establishes that part of the stress evolution is left to
+model-dependent implicit selection. The experiment compares a common
+declared recipe against the complete exact reference; it does not certify
+solution of the fully prescribed initial-boundary-value problem.
+
+Table~\ref{tab:xmin} completes the single-seed cutoff comparison.
+Stress sensitivity is nonmonotone and model-dependent: the declared
+cutoff gives the lowest tested circuit and reference-MLP stress errors,
+but the highest of the matched MLP's tested stress errors. The circuit
+and reference MLP therefore do not establish a generally beneficial
+cutoff. Temperature ordering differs. None of these outcomes is a
+replicated effect estimate. The separate weight ablation lowers stress
+error when the rate term is restored, but not uniformly temperature
+error (Supplementary Table~S7). Both ablations change the temperature-rate
+and stress-rate penalties together.
+
+\begin{table}[htbp]
+\centering\footnotesize
+\caption{Near-surface initial-rate exclusion ablation, exponential pulse,
+$\gamma=9$, seed $0$, $N_c=512$. Every row is an individual-run outcome
+($n=1$), with no standard deviation. Learning rates are $0.1$ for VQC/MLP
+and $0.01$ for MLP-ref. The replay verifies the reference-MLP thread
+setting and is not an extra cutoff replicate.}
+\label{tab:xmin}
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lrrrr}
+\toprule
+Model & $P_{\rm nom}/P_{\rm out}$ & $x_{\min}$ & $e_T$ & $e_\sigma$ \\
+\midrule
+VQC & $124/88$ & $0$ & $0.1824$ & $0.9644$ \\
+VQC & $124/88$ & $0.1$ & $0.1709$ & $1.1081$ \\
+VQC & $124/88$ & $0.3$ & $0.1939$ & $0.8785$ \\
+\midrule
+MLP & $114/114$ & $0$ & $0.1330$ & $0.2695$ \\
+MLP & $114/114$ & $0.1$ & $0.1294$ & $0.2393$ \\
+MLP & $114/114$ & $0.3$ & $0.1959$ & $0.3409$ \\
+\midrule
+MLP-ref & $12802/12802$ & $0$ & $0.0176$ & $0.1001$ \\
+MLP-ref & $12802/12802$ & $0.1$ & $0.0143$ & $0.0705$ \\
+MLP-ref & $12802/12802$ & $0.3$ & $0.0085$ & $0.0496$ \\
+MLP-ref & $12802/12802$ & $0.6$ & $0.0166$ & $0.0617$ \\
+MLP-ref & $12802/12802$ & $1$ & $0.0082$ & $0.0732$ \\
+MLP-ref replay & $12802/12802$ & $0.3$ & $0.0074$ & $0.0461$ \\
+\bottomrule
+\end{tabular}
+\par\smallskip
+\begin{minipage}{\textwidth}\footnotesize
+The VQC/MLP cutoff-$0.3$ rows reuse their E1 seed-$0$ records. Other
+cutoff runs use the ablation launcher's $2$ threads. The reference
+cutoff-$0.3$ run ends at $1060$ L-BFGS closures; the $3$-thread replay
+reproduces E1 exactly at $1065$ closures. Supplementary Section~S1 discusses the comparison. The reference stress-error span across its
+five $2$-thread cutoff runs is $0.0506$.
+\end{minipage}
+\end{table}
+
+\subsection{Training, tuning, and computational accounting}
+
+Table~\ref{tab:training} gives the common nominal schedule. Initial learning rates
+are selected independently by minimizing $e_T+e_\sigma$ on fixed random
+validation points, never the test grid. Complete candidate histories and
+selected scores are released (Supplementary Table~S4). The upper boundary
+is selected in $11/21$ E1 and $10/12$ E1b cells; one E1 cell selects the
+lower boundary (Supplementary Table~S4). These are conditional comparisons
+under the executed tuning and training recipe, not evidence that each
+architecture attained its best achievable accuracy. Selection after Adam
+also need not identify the best subsequent Adam--L-BFGS endpoint.
+
+The E3 label sweep measures production training-label efficiency
+conditional on separately selected hyperparameters. Its data-only rates
+were selected once at $N_d=256$, using $256$ exact training samples and
+$2000$ exact validation samples shared across the five candidate rates
+(Table~\ref{tab:training}; Supplementary Table~S4). This fixed tuning
+overhead is outside the production $N_d$ axis. Production runs also
+compute exact-label validation diagnostics, but these neither drive
+updates nor select checkpoints. Thus $N_d$ is not the total exact-label
+requirement for developing or evaluating the tuned learner.
+
+Actual L-BFGS closure calls are objective evaluations, distinct from
+optimizer iterations, and vary across runs (Supplementary Table~S5).
+The timer covers training, periodic validation, and final test-grid
+evaluation, excluding model construction, exact-data preparation, and
+tuning. E1 uses the shared CPU with the concurrency and thread settings
+in Supplementary Table~S3; other launchers differ. Consequently, the
+reported durations are implementation-specific shared-machine timings,
+not isolated throughput, total campaign cost, or quantum-hardware cost.
+E3 timings are contention-affected observed durations, unsuitable for
+isolated-throughput comparisons; E1 is retained as the primary cost comparison.
+A reference-MLP
+replay at E1's thread setting reproduces its numerical history and endpoint;
+the different-thread cutoff run diverges only during L-BFGS
+(Table~\ref{tab:xmin}; Supplementary Section~S1). Thread-dependent
+reduction order amplified by the line search is a plausible explanation,
+not a separately tested causal diagnosis.
+
+\subsection{Metrics and diagnostic protocols}
+
+For $F\in\{T,\sigma\}$ and test grid $\mathcal G$,
+\begin{equation}
+ e_F=\left[\frac{\sum_{z\in\mathcal G}|F_\vartheta(z)-F^*(z)|^2}
+ {\sum_{z\in\mathcal G}|F^*(z)|^2}\right]^{1/2},\qquad
+ a_F=\max_{z\in\mathcal G}|F_\vartheta(z)-F^*(z)|.
+ \label{eq:metrics}
+\end{equation}
+E1, E1b, and secondary-speed errors use means and sample standard
+deviations with denominator $n-1$. E3 instead reports means and both seed
+values or their observed range, because each cell has only two seeds
+(Table~\ref{tab:e3}); these ranges are not confidence intervals.
+All completed runs, including poor fits, are retained. Best seeds are
+descriptive minima. No significance or equivalence test is used.
+
+E2 compares the full physics objective with
+\begin{equation}
+ \mathcal L_D=\langle(T_\vartheta-T^*)^2\rangle_D
+ +\langle(\sigma_\vartheta-\sigma^*)^2\rangle_D,\qquad
+ \mathcal L_C=\mathcal L_P+\mathcal L_D.
+\end{equation}
+The selected derivative, sampling, and variance denominator are specified
+in Table~\ref{tab:diagnostics}. Multiplying an objective by a constant
+multiplies gradient variance by its square; absolute variance increases
+must therefore be interpreted with the stated normalization.
+
+\begin{table}[htbp]
+\centering
+\caption{Diagnostic settings from the released code and executed records.}
+\label{tab:diagnostics}
+\begin{tabular}{p{0.25\linewidth}p{0.65\linewidth}}
+\toprule
+Diagnostic & Setting \\
+\midrule
+E2 circuit scan & $n_q=2,3,4,5,6,7,8,9,10$; $L=2,4,8$;
+$200$ random initializations with seeds $0$--$199$ per cell;
+exponential pulse, $\gamma=9$ \\
+E2 sampled derivative & First-layer trainable $R_Y$ angle on qubit $0$ \\
+E2 points & $256$ fixed uniform interior points, shared between objectives;
+$64$ boundary times; point-set generator seed $0$ \\
+E2 variance & \texttt{numpy.var} with denominator $200$
+(\texttt{ddof=0}) \\
+E2 fit & Ordinary least squares of $\log_{10}\Var(\partial\mathcal L/
+\partial\theta)$ against $n_q$ \\
+E1 gradient summaries & Mean gradient norm over the first and last
+$50$ Adam steps \\
+E4 checkpoints & Lowest-$e_\sigma$ $2$ E1 seeds per pulse/configuration;
+listed in Supplementary Table~S10 \\
+E4 evaluation & $41\times40$ grid; binomial samples of each Pauli-$Z$
+expectation at $N=10^3,10^4,10^5$ shots per input and observable \\
+E4 channel & Pauli-error depolarization after every layer on every qubit;
+$p=0,10^{-3},10^{-2}$; density-matrix inference; exact controls at each $p$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+E4 evaluates selected checkpoints without retraining. Its dispersion is
+across trained checkpoints, not independent repeated shot trials. The
+per-qubit channel after each layer is
+\begin{equation}
+ \mathcal E_{p,q}(\rho)=(1-p)\rho+\frac p3
+ (X_q\rho X_q+Y_q\rho Y_q+Z_q\rho Z_q).
+ \label{eq:channel}
+\end{equation}
+Here $p$ is total Pauli-error probability. Independent marginal binomial
+draws estimate the readouts using $N$ measurements per input and
+observable; commuting readouts could instead share hardware bitstrings.
+The evaluator uses each checkpoint's run seed for its sampling generator.
+It does not estimate repeated-shot uncertainty or test noisy optimization.
+
+\section{Results}
+
+\subsection{Nominal and output-affecting parameter comparisons}
+
+Table~\ref{tab:e1} is the numerical anchor for E1;
+Figure~\ref{fig:e1} displays its field errors. The nominally matched MLP
+has lower mean temperature and stress errors in every pulse--configuration
+cell. The circuit/MLP mean stress-error ratios range from $1.788$ to
+$3.645$ (Table~\ref{tab:e1}). These are ratios of means, not paired
+significance tests. The larger circuit's recorded runtime is
+$171.7$--$228.3$ times the matched MLP's, compared with
+$41.7$--$51.8$ for the smaller circuit (Table~\ref{tab:e1}).
+
+\begin{table}[htbp]
+\centering
+\caption{E1 nominal-count comparisons. Errors and recorded runtime are mean $\pm$ sample standard deviation across five seeds. $P_{\rm nom}/P_{\rm out}$ lists registered and output-affecting parameter counts, respectively; $P_{\rm out}$ is not a proven independent functional dimension. $R_\sigma$ in each VQC row is its mean stress error divided by its nominally matched MLP mean. Runtime includes training and both evaluations under the stated concurrent execution conditions.}
+\label{tab:e1}
+\scriptsize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lllrrrrr}
+\toprule
+Pulse & Config. & Model & $P_{\rm nom}/P_{\rm out}$ & $e_T$ & $e_\sigma$ & Runtime (s) & $R_\sigma$ \\
+\midrule
+exp & 4q2L & VQC & $44/30$ & $0.4699\pm0.1428$ & $1.1137\pm0.1711$ & $725.1\pm68.2$ & $3.645$ \\
+exp & 4q2L & MLP & $42/42$ & $0.3178\pm0.0738$ & $0.3055\pm0.0608$ & $15.7\pm1.4$ & -- \\
+exp & 4q2L & Spectral & $40/40$ & $0.4500\pm0.1532$ & $0.7826\pm0.2417$ & $45.0\pm3.2$ & -- \\
+exp & 6q4L & VQC & $124/88$ & $0.1779\pm0.0439$ & $0.7608\pm0.1884$ & $4188.9\pm251.0$ & $3.544$ \\
+exp & 6q4L & MLP & $114/114$ & $0.0990\pm0.0584$ & $0.2146\pm0.1375$ & $19.7\pm0.5$ & -- \\
+exp & 6q4L & Spectral & $116/116$ & $0.2401\pm0.1689$ & $0.5719\pm0.2035$ & $44.1\pm3.7$ & -- \\
+exp & -- & MLP-ref & $12802/12802$ & $0.0125\pm0.0029$ & $0.0539\pm0.0076$ & $214.6\pm9.4$ & -- \\
+\midrule
+step & 4q2L & VQC & $44/30$ & $0.6688\pm0.1857$ & $1.1934\pm0.3074$ & $624.5\pm15.5$ & $2.506$ \\
+step & 4q2L & MLP & $42/42$ & $0.3314\pm0.0683$ & $0.4762\pm0.0743$ & $15.0\pm0.1$ & -- \\
+step & 4q2L & Spectral & $40/40$ & $0.7012\pm0.0570$ & $0.9526\pm0.0595$ & $42.5\pm3.4$ & -- \\
+step & 6q4L & VQC & $124/88$ & $0.2579\pm0.0336$ & $0.8954\pm0.1136$ & $3644.1\pm21.1$ & $2.513$ \\
+step & 6q4L & MLP & $114/114$ & $0.2105\pm0.0904$ & $0.3564\pm0.1015$ & $21.2\pm2.8$ & -- \\
+step & 6q4L & Spectral & $116/116$ & $0.3405\pm0.1200$ & $0.3825\pm0.0742$ & $47.3\pm3.4$ & -- \\
+step & -- & MLP-ref & $12802/12802$ & $0.0221\pm0.0147$ & $0.0517\pm0.0086$ & $212.6\pm7.8$ & -- \\
+\midrule
+smooth & 4q2L & VQC & $44/30$ & $0.3260\pm0.0582$ & $0.9826\pm0.0958$ & $758.4\pm115.0$ & $1.788$ \\
+smooth & 4q2L & MLP & $42/42$ & $0.2220\pm0.0870$ & $0.5496\pm0.3482$ & $14.6\pm1.0$ & -- \\
+smooth & 4q2L & Spectral & $40/40$ & $0.6403\pm0.1968$ & $0.9434\pm0.1900$ & $43.1\pm8.7$ & -- \\
+smooth & 6q4L & VQC & $124/88$ & $0.1664\pm0.0342$ & $0.5733\pm0.0696$ & $4473.7\pm466.5$ & $3.364$ \\
+smooth & 6q4L & MLP & $114/114$ & $0.0519\pm0.0143$ & $0.1704\pm0.0632$ & $19.6\pm2.6$ & -- \\
+smooth & 6q4L & Spectral & $116/116$ & $0.2524\pm0.1288$ & $0.6254\pm0.2388$ & $43.3\pm4.1$ & -- \\
+smooth & -- & MLP-ref & $12802/12802$ & $0.0058\pm0.0013$ & $0.0296\pm0.0106$ & $192.8\pm10.6$ & -- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[htbp]
+\centering\includegraphics[width=\textwidth]{fig_e1_errors.pdf}
+\caption{E1 nominal-count comparison at the settings of
+Tables~\ref{tab:problem}--\ref{tab:training}. Bars show mean relative
+temperature and stress errors; error bars are sample standard deviations
+over five seeds. Solid bars represent the larger configuration and hatched
+bars the smaller one; the reference MLP is separate. Circuit
+$P_{\rm nom}/P_{\rm out}$ is $124/88$ or $44/30$, with classical counts
+listed in Table~\ref{tab:e1}. The plot does not show E1b.}
+\label{fig:e1}
+\end{figure}
+
+E1b addresses the inert-coordinate imbalance by comparing the same circuits
+with retuned smaller classical networks. The MLP again has lower mean
+errors for both fields in all six cells, with mean stress-error ratios
+$1.558$--$4.493$ (Table~\ref{tab:e1b}). The nominal-count result therefore
+does not reverse when this imbalance is reduced. This does not establish
+equal intrinsic model dimension or a universal classical advantage.
+The spectral baseline is less consistent: its temperature error exceeds
+the circuit's in five of six E1b cells, and its larger smooth-pulse stress
+error also exceeds the circuit's (Tables~\ref{tab:e1} and \ref{tab:e1b}).
+
+\begin{table}[htbp]
+\centering
+\caption{E1b classical comparisons targeting circuit output-affecting counts $30$ and $88$, for circuits with $P_{\rm nom}/P_{\rm out}=44/30$ and $124/88$. Each error is mean $\pm$ sample standard deviation over five seeds, with learning rates reselected per cell. $\Delta P$ is the classical count deviation from the target in percent; $R_\sigma$ is the corresponding E1 VQC mean stress error divided by the classical mean.}
+\label{tab:e1b}
+\scriptsize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lllrrrrr}
+\toprule
+Pulse & Target & Model & $P_{\rm nom}/P_{\rm out}$ & $\Delta P$ (\%) & $e_T$ & $e_\sigma$ & $R_\sigma$ \\
+\midrule
+exp & 4q2L & MLP & $29/29$ & $-3.33$ & $0.3322\pm0.0579$ & $0.4396\pm0.1554$ & $2.533$ \\
+exp & 4q2L & Spectral$^{\dagger}$ & $40/40$ & $+33.33$ & $0.4500\pm0.1532$ & $0.7826\pm0.2417$ & $1.423$ \\
+exp & 6q4L & MLP & $93/93$ & $+5.68$ & $0.1379\pm0.0302$ & $0.2857\pm0.0607$ & $2.663$ \\
+exp & 6q4L & Spectral & $97/97$ & $+10.23$ & $0.3162\pm0.1474$ & $0.6332\pm0.0497$ & $1.201$ \\
+\midrule
+step & 4q2L & MLP & $29/29$ & $-3.33$ & $0.5283\pm0.1594$ & $0.7658\pm0.3048$ & $1.558$ \\
+step & 4q2L & Spectral$^{\dagger}$ & $40/40$ & $+33.33$ & $0.7012\pm0.0570$ & $0.9526\pm0.0595$ & $1.253$ \\
+step & 6q4L & MLP & $93/93$ & $+5.68$ & $0.1710\pm0.0267$ & $0.1993\pm0.0391$ & $4.493$ \\
+step & 6q4L & Spectral & $97/97$ & $+10.23$ & $0.3425\pm0.1174$ & $0.7213\pm0.2003$ & $1.241$ \\
+\midrule
+smooth & 4q2L & MLP & $29/29$ & $-3.33$ & $0.2652\pm0.0251$ & $0.4884\pm0.0163$ & $2.012$ \\
+smooth & 4q2L & Spectral$^{\dagger}$ & $40/40$ & $+33.33$ & $0.6403\pm0.1968$ & $0.9434\pm0.1900$ & $1.042$ \\
+smooth & 6q4L & MLP & $93/93$ & $+5.68$ & $0.0902\pm0.0258$ & $0.3631\pm0.2001$ & $1.579$ \\
+smooth & 6q4L & Spectral & $97/97$ & $+10.23$ & $0.3688\pm0.1425$ & $0.8194\pm0.1841$ & $0.700$ \\
+\bottomrule
+\end{tabular}
+\par\smallskip
+\begin{minipage}{\textwidth}\footnotesize
+$\dagger$ The implemented spectral width search starts at $h=2$, giving a minimum of $40$ parameters. These rows repeat the E1 network outcomes and are not valid output-count matches. A width-one spectral network would have $21$ parameters but was not included in the implemented search. The $97$-parameter spectral model differs from target $88$ by $10.23\%$, slightly exceeding $10\%$.
+\end{minipage}
+\end{table}
+
+Figure~\ref{fig:fields} shows representative best-stress-seed fields.
+The reference MLP attains substantially smaller errors under this recipe
+(Table~\ref{tab:e1}); the images illustrate spatial discrepancies without
+establishing representational impossibility for any family.
+
+\begin{figure}[htbp]
+\centering\includegraphics[width=\textwidth]{fig_fields_exp.pdf}
+\caption{Exact and learned exponential-pulse fields at $\gamma=9$.
+Temperature is above stress; columns show the exact solution, the larger
+circuit ($P_{\rm nom}/P_{\rm out}=124/88$), nominally matched MLP
+($114/114$), and reference MLP ($12802/12802$). Learned examples use the
+minimum-stress-error E1 seeds, identified in Supplementary Table~S6.
+Quantitative color bars give dimensionless $T$ and $\sigma$. The
+characteristic $x=3t$ follows the wave speed in Table~\ref{tab:problem}.
+These are selected examples, not replicated error summaries.}
+\label{fig:fields}
+\end{figure}
+
+\subsection{Gradient variance}
+
+Figure~\ref{fig:e2} and Table~\ref{tab:e2summary} summarize the variance
+of a selected derivative of the full physics objective. The physics/data
+variance multipliers range from $5.19$--$20.31$, $70.89$--$375.41$, and
+$2726.20$--$9311.63$ across the respective depths (Supplementary Table~S9).
+The deepest whole-range slopes are negative, but its largest-qubit refits
+are positive (Table~\ref{tab:e2summary}). Thus neither unchanged decay
+nor persistent exponential scaling is established.
+
+\begin{table}[htbp]
+\centering
+\caption{Descriptive ordinary-least-squares slopes of $\log_{10}\operatorname{Var}(\partial\mathcal L/\partial\theta)$ versus qubit count. The selected derivative is the first-layer $R_Y$ angle on qubit $0$; each variance uses $200$ initializations. The final row refits the largest-qubit portion of the deepest scan. No slope-equivalence test or asymptotic exponent is inferred.}
+\label{tab:e2summary}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{rrrrr}
+\toprule
+Depth $L$ & Fitted $n_q$ range & Data & Full physics & Combined \\
+\midrule
+2 & $2$--$10$ & $-0.008$ & $+0.027$ & $+0.020$ \\
+4 & $2$--$10$ & $-0.038$ & $-0.076$ & $-0.074$ \\
+8 & $2$--$10$ & $-0.206$ & $-0.227$ & $-0.227$ \\
+8 & $7$--$10$ & $+0.014$ & $+0.020$ & $+0.020$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[htbp]
+\centering\includegraphics[width=\textwidth]{fig_e2_gradvar.pdf}
+\caption{Variance of the first-layer measured-qubit $R_Y$ derivative at
+random initialization, for the objectives and sampling in
+Table~\ref{tab:diagnostics}. Integer qubit ticks and distinct markers
+separate the full physics and combined objectives. The curves use
+population-denominator variance over $200$ initializations per cell;
+they are not mean--standard-deviation bands. Full values are in
+Supplementary Table~S8 and descriptive slopes in
+Table~\ref{tab:e2summary}.}
+\label{fig:e2}
+\end{figure}
+
+At fixed depth a local readout has a bounded backward causal cone, so
+indefinite qubit growth cannot be assumed to reproduce a whole-range
+finite-size fit \citep{Cerezo2021}. This observation limits extrapolation;
+it does not demonstrate that cone saturation caused the observed tail,
+whose circuit can still span the tested ring. Individual gradient draws
+are not retained, and no slope-equivalence test is available. E2 therefore
+answers a narrower question than a barren-plateau theorem and does not
+isolate the contribution of the PDE residual from the other physics terms.
+
+\subsection{Efficiency}
+\label{sec:efficiency}
+
+The completed E3 sweeps address parameter count, collocation budget, and
+production training-label budget conditional on separately selected
+hyperparameters for the exponential pulse. Table~\ref{tab:e3}
+reports means and observed ranges over the declared two seeds;
+Supplementary Section~S9 retains every individual run, matching deviation,
+learning rate, point budget, runtime, and realized closure count.
+The parameter and collocation sweeps use the reference physics recipe;
+data-only training uses $\mathcal L_D$, fixed exact interior samples,
+separately selected rates, and no boundary, rate, or PDE penalty or L-BFGS
+(Table~\ref{tab:e3}; Supplementary Tables~S3--S4).
+
+\paragraph{Parameter count.}
+The nominally matched MLP has lower mean stress error at every tested
+configuration, by factors $2.0$--$8.5$ (Table~\ref{tab:e3};
+Figure~\ref{fig:e3pareto}). Even the best circuit run, $e_\sigma=0.3951$
+at $(n_q,L)=(6,8)$, exceeds the smallest MLP's mean $0.3067$ at
+$42$ parameters. The best circuit mean is $0.4464$ at
+$244/208$ nominal/output-affecting parameters (Table~\ref{tab:e3}).
+Changing the horizontal coordinate to the output-affecting count does
+not change this accuracy ordering. It does not, however, establish strict
+Pareto domination of every circuit point: the shallow circuits have fewer
+output-affecting coordinates than the smallest E3 MLP
+(Table~\ref{tab:e3}; Supplementary Table~S2). E1b supplies the separate
+comparison with smaller classical networks (Table~\ref{tab:e1b}).
+
+The depth-$2$ circuits with $4$, $6$, and $8$ qubits realize the same
+$30$-coordinate output family, not merely the same output-affecting count
+(Supplementary Section~S2). The final CZ layer cancels in the measured
+$Z$ expectations; propagation through the preceding ring leaves only
+qubits $0,1$ and their neighbors $2,n_q-1$. Relabeling these active qubits
+therefore preserves the family. The supplied execution of
+\path{family_equivalence.py} confirms the parameter transplant to
+numerical precision (Supplementary Sections~S2 and~S8).
+Their stress means $1.0127$, $1.4455$, and $2.0390$ are differently
+initialized and trained realizations of that same family with different
+simulation cost, not a capacity trend (Table~\ref{tab:e3}). At fixed
+width, increasing depth reduces stress error from $1.4455$ through
+$0.7352$ to $0.4464$ (Table~\ref{tab:e3}); this remains an observed
+trend without an identified mechanism. The deepest circuit
+approaches the MLP's temperature accuracy, $0.0598$ versus $0.0557$,
+without an equivalence test. Spectral stress errors fall between circuit
+and MLP in all but the $(6,4)$ design, where the spectral mean is slightly
+larger than the circuit's (Table~\ref{tab:e3}).
+
+The classical rows for circuit targets $(4,4)$ and $(8,2)$ share
+architectures and identical numerical outcomes; their repeated executions
+are marked in Table~\ref{tab:e3}. Their MLP count deviation is $+10.71\%$;
+the $(6,2)$ MLP deviation is $-10.94\%$, both outside the prescribed
+tolerance (Supplementary Table~S2). The $(4,2)$ and $(6,4)$ parameter
+runs exactly reproduce the corresponding E1 numerical histories and
+errors for the same seeds, although recorded runtimes differ
+(Supplementary Section~S1). They do not add independent replication.
+
+\begin{figure}[htbp]
+\centering\includegraphics[width=0.80\textwidth]{fig_e3_pareto.pdf}
+\caption{E3 stress error versus parameter count for the exponential pulse,
+$\gamma=9$, using means of seeds $0,1$. Red filled circles use circuit
+nominal counts; hollow squares show the same errors at output-affecting
+counts. Blue and green points denote nominally matched MLP and spectral
+models. Lines connect evaluated architectures and are not fitted Pareto
+envelopes. The duplicated classical outcomes at the common nominal target
+are shared. The depth-$2$ circuits at $4$, $6$, and $8$ qubits are
+different training realizations of one $30$-coordinate output family,
+as established by the causal structure and supplied parameter-transplant
+check (Supplementary Sections~S2 and~S8); their width sequence is not a
+capacity comparison. Table~\ref{tab:e3} gives both-seed ranges and Supplementary
+Table~S2 gives every count and matching deviation.}
+\label{fig:e3pareto}
+\end{figure}
+
+\paragraph{Collocation budget.}
+Increasing the number of residual points does not systematically lower
+either family's errors or close the stress gap in the tested range
+(Table~\ref{tab:e3}; Figure~\ref{fig:e3colloc}). Across shared budgets,
+the circuit/MLP stress-mean ratio is $2.0$--$4.4$, and every completed
+circuit run has stress error above $0.5$ (Table~\ref{tab:e3}).
+The nonmonotone means and limited seed replication do not prove that
+either architecture is generally free of collocation limitations.
+
+The circuit uses $N_c=64,256,512,1024$; the MLP also uses $4096$.
+The baseline at $512$ reuses the parameter-sweep runs. The circuit jobs
+at $4096$ were dropped after an initial execution was stopped for cost;
+the measured-rate projection was about $32400\,\mathrm{s}$ per seed
+after $2100\,\mathrm{s}$ of observation, including a fixed L-BFGS set
+of $16384$ points (Table~\ref{tab:e3}; Supplementary Table~S3).
+This is a declared deviation from the planned sweep, not an unreported
+completed outcome. The retained campaign contains $66$ of the planned
+$68$ runs (Supplementary Table~S1).
+
+\begin{figure}[htbp]
+\centering\includegraphics[width=0.80\textwidth]{fig_e3_colloc.pdf}
+\caption{E3 stress error versus collocation points per Adam step.
+Physics-only training uses fixed L-BFGS sets of $4N_c$ points.
+Means use seeds $0,1$ for the $(6,4)$ circuit ($124/88$ parameters)
+and nominally matched MLP ($114/114$). Circuit budgets are
+$64,256,512,1024$; the MLP also includes $4096$. The circuit's largest
+planned budget was dropped for cost. The baseline at $512$ is reused
+from the parameter sweep. Observed ranges are in Table~\ref{tab:e3}.}
+\label{fig:e3colloc}
+\end{figure}
+
+\paragraph{Production training labels.}
+The $N_d$ axis counts exact interior samples used for production updates,
+conditional on the separate tuning at $N_d=256$. It excludes the fixed
+tuning set of $256$ exact training samples plus $2000$ exact validation
+samples shared across the five candidate rates, and the production
+validation diagnostics (Table~\ref{tab:training}; Supplementary Table~S4).
+Those diagnostics neither drive updates nor select checkpoints.
+Under supervision, circuit stress means fall from $2.1382$ at $16$ labels
+to $0.2918$ at $256$ and $0.2178$ at $1024$; the last value is
+$3.375$ times lower than its physics-only mean for the same seeds
+(Table~\ref{tab:e3}; Figure~\ref{fig:e3data}). Thus the same architecture
+can represent a more accurate stress field than physics training attained.
+The gap is partly training-objective dependent, rather than evidence of
+representational impossibility. This comparison changes information,
+objective, rate, and optimizer schedule, so it cannot establish that the
+loss landscape is the main cause.
+
+The MLP remains more accurate at every label budget, with stress-mean
+ratios $1.4$--$3.3$. Its means change little from $0.0884$ to $0.0872$
+between the largest budgets. The circuit at $1024$ labels still exceeds
+the MLP mean at $64$ labels, $0.2178$ versus $0.1903$
+(Table~\ref{tab:e3}). These observed production training budgets differ by
+a factor of $16$; they estimate neither an equal-error sample-complexity
+ratio nor a total label-acquisition ratio. At the smallest
+budget both families have mean errors above unity for both fields
+(Table~\ref{tab:e3}).
+
+\begin{figure}[htbp]
+\centering\includegraphics[width=0.80\textwidth]{fig_e3_data.pdf}
+\caption{E3 stress error versus fixed exact interior training samples
+$N_d$ in production runs conditional on separately selected hyperparameters.
+Means use seeds $0,1$ for the same circuit and MLP
+as Figure~\ref{fig:e3colloc}. Training uses $2000$ Adam steps, no PDE,
+boundary, or initial-rate penalty, and no L-BFGS. Validation-selected
+rates are $0.03$ for the circuit and $0.1$ for the MLP, selected once at
+$N_d=256$ using $256$ training and $2000$ validation samples shared by
+the five candidates. The horizontal axis excludes these tuning labels
+and production validation diagnostics, which neither drive updates nor
+select checkpoints (Table~\ref{tab:training}). Table~\ref{tab:e3}
+provides the two-seed ranges.}
+\label{fig:e3data}
+\end{figure}
+
+E3 timings are contention-affected observed durations, unsuitable for
+isolated-throughput comparisons.
+For example, the deepest physics circuit takes $8683$--$11552\,\mathrm{s}$,
+whereas its MLP takes $19$--$22\,\mathrm{s}$; the supervised circuit ranges
+from $28$ to $156\,\mathrm{s}$ across label budgets (Supplementary
+Table~S16). These are not controlled cost ratios. E1 remains the primary
+wall-clock comparison (Table~\ref{tab:e1}; Supplementary Table~S3).
+
+\begin{table}[!htbp]
+\centering\footnotesize
+\setlength{\tabcolsep}{4pt}
+\caption{E3 errors: mean [minimum, maximum] over seeds $0,1$ ($n=2$).
+$P$ denotes nominal/output-affecting counts. Parameter rows use $N_c=512$;
+collocation rows vary $N_c$ with $4N_c$ fixed L-BFGS points; data rows vary
+$N_d$ conditional on separate tuning (Table~\ref{tab:training}) and omit
+all physics losses and L-BFGS. All physics rates are $0.1$;
+data rates are $0.03$ (VQC) and $0.1$ (MLP). Budgets and per-seed times,
+closures, and matching deviations are retained in the supplement.
+The $N_c=512$ rows reuse the parameter-sweep records.
+A dagger marks classical outcomes identical to the $(4,4)$ executions,
+not additional independent evidence.}\label{tab:e3}
+\begin{tabular}{llcll}
+\toprule
+Design/budget & Model & $P$ & $e_T$ & $e_\sigma$ \\
+\midrule
+\multicolumn{5}{l}{\textit{Parameter sweep: $(n_q,L)$}}\\
+$4,2$ & VQC & $44/30$ & $0.4030\,[0.2561,0.5500]$ & $1.0127\,[0.8460,1.1794]$ \\
+$4,2$ & MLP & $42/42$ & $0.2755\,[0.2723,0.2788]$ & $0.3067\,[0.2311,0.3823]$ \\
+$4,2$ & Spectral & $40/40$ & $0.4056\,[0.4001,0.4112]$ & $0.8616\,[0.7746,0.9487]$ \\
+$4,4$ & VQC & $84/70$ & $0.1947\,[0.1905,0.1990]$ & $0.9752\,[0.9030,1.0473]$ \\
+$4,4$ & MLP & $93/93$ & $0.1052\,[0.1005,0.1100]$ & $0.2403\,[0.2196,0.2610]$ \\
+$4,4$ & Spectral & $78/78$ & $0.2830\,[0.1796,0.3864]$ & $0.5552\,[0.4204,0.6899]$ \\
+$6,2$ & VQC & $64/30$ & $0.6330\,[0.6162,0.6498]$ & $1.4455\,[1.3497,1.5413]$ \\
+$6,2$ & MLP & $57/57$ & $0.1530\,[0.1020,0.2040]$ & $0.3598\,[0.2854,0.4341]$ \\
+$6,2$ & Spectral & $59/59$ & $0.3909\,[0.2988,0.4830]$ & $0.8662\,[0.8510,0.8815]$ \\
+$6,4$ & VQC & $124/88$ & $0.1657\,[0.1376,0.1939]$ & $0.7352\,[0.5919,0.8785]$ \\
+$6,4$ & MLP & $114/114$ & $0.1402\,[0.0844,0.1959]$ & $0.3640\,[0.3409,0.3872]$ \\
+$6,4$ & Spectral & $116/116$ & $0.2159\,[0.1650,0.2667]$ & $0.7825\,[0.7594,0.8056]$ \\
+$6,8$ & VQC & $244/208$ & $0.0598\,[0.0591,0.0606]$ & $0.4464\,[0.3951,0.4977]$ \\
+$6,8$ & MLP & $249/249$ & $0.0557\,[0.0359,0.0756]$ & $0.1195\,[0.0935,0.1455]$ \\
+$6,8$ & Spectral & $249/249$ & $0.1420\,[0.1327,0.1513]$ & $0.3823\,[0.3583,0.4064]$ \\
+$8,2$ & VQC & $84/30$ & $0.8757\,[0.6694,1.0819]$ & $2.0390\,[1.7132,2.3649]$ \\
+$8,2$ & MLP$^{\dagger}$ & $93/93$ & $0.1052\,[0.1005,0.1100]$ & $0.2403\,[0.2196,0.2610]$ \\
+$8,2$ & Spectral$^{\dagger}$ & $78/78$ & $0.2830\,[0.1796,0.3864]$ & $0.5552\,[0.4204,0.6899]$ \\
+\midrule\multicolumn{5}{l}{\textit{Collocation sweep: $N_c$, $(n_q,L)=(6,4)$}}\\
+$64$ & VQC & $124/88$ & $0.2199\,[0.1051,0.3348]$ & $0.8198\,[0.8078,0.8318]$ \\
+$64$ & MLP & $114/114$ & $0.1287\,[0.0870,0.1705]$ & $0.2041\,[0.2023,0.2060]$ \\
+$256$ & VQC & $124/88$ & $0.2158\,[0.2140,0.2176]$ & $0.6687\,[0.5376,0.7998]$ \\
+$256$ & MLP & $114/114$ & $0.1198\,[0.0906,0.1491]$ & $0.2575\,[0.2438,0.2713]$ \\
+$512$ & VQC & $124/88$ & $0.1657\,[0.1376,0.1939]$ & $0.7352\,[0.5919,0.8785]$ \\
+$512$ & MLP & $114/114$ & $0.1402\,[0.0844,0.1959]$ & $0.3640\,[0.3409,0.3872]$ \\
+$1024$ & VQC & $124/88$ & $0.2139\,[0.1815,0.2463]$ & $0.7594\,[0.6938,0.8250]$ \\
+$1024$ & MLP & $114/114$ & $0.0962\,[0.0770,0.1154]$ & $0.1726\,[0.0886,0.2566]$ \\
+$4096$ & MLP & $114/114$ & $0.1165\,[0.1118,0.1213]$ & $0.2968\,[0.2496,0.3441]$ \\
+\midrule\multicolumn{5}{l}{\textit{Label sweep: $N_d$, $(n_q,L)=(6,4)$}}\\
+$16$ & VQC & $124/88$ & $1.6397\,[0.9935,2.2859]$ & $2.1382\,[1.7633,2.5130]$ \\
+$16$ & MLP & $114/114$ & $1.0870\,[0.7236,1.4504]$ & $1.5074\,[1.2370,1.7778]$ \\
+$64$ & VQC & $124/88$ & $0.2798\,[0.2571,0.3024]$ & $0.5336\,[0.4412,0.6260]$ \\
+$64$ & MLP & $114/114$ & $0.0802\,[0.0738,0.0865]$ & $0.1903\,[0.1577,0.2229]$ \\
+$256$ & VQC & $124/88$ & $0.1907\,[0.1873,0.1940]$ & $0.2918\,[0.2882,0.2953]$ \\
+$256$ & MLP & $114/114$ & $0.1007\,[0.0873,0.1140]$ & $0.0884\,[0.0773,0.0995]$ \\
+$1024$ & VQC & $124/88$ & $0.1920\,[0.1769,0.2070]$ & $0.2178\,[0.2146,0.2211]$ \\
+$1024$ & MLP & $114/114$ & $0.0776\,[0.0682,0.0870]$ & $0.0872\,[0.0858,0.0885]$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+\FloatBarrier
+
+\subsection{Noise and readout sensitivity}
+
+Table~\ref{tab:e4ratios} compares each selected checkpoint pair with its
+same-grid, zero-noise exact-expectation control. Supplementary Table~S10
+merges seed identities, individual gains, offsets, and clean errors;
+Tables~S11--S12 preserve every noise condition. These controls use the
+noise grid, not the E1-grid metadata stored alongside the records.
+
+For the larger exponential-pulse circuit, mean stress error is
+$0.5804\pm0.0166$ clean and $2.5758\pm0.2728$, $0.9735\pm0.0950$, and
+$0.6299\pm0.0251$ at $10^3$, $10^4$, and $10^5$ shots per input and
+observable, respectively ($n=2$; Supplementary Table~S11). At the lowest
+budget the larger-circuit stress multipliers span $1.642$--$4.438$,
+whereas smaller-circuit multipliers span $8.637$--$22.396$
+(Table~\ref{tab:e4ratios}).
+
+\begin{table}[htbp]
+\centering
+\caption{Ratios of corrected E4 mean stress error to the corresponding same-grid clean mean. Shot columns use $p=0$; channel columns use exact expectations. Ratios are descriptive ratios of two-seed means, not means of paired ratios or significance tests.}
+\label{tab:e4ratios}
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{llrrrrr}
+\toprule
+Pulse & $P_{\rm nom}/P_{\rm out}$ & $N=10^3$ & $10^4$ & $10^5$ & $p=10^{-3}$ & $10^{-2}$ \\
+\midrule
+exp & $44/30$ & $22.396$ & $7.349$ & $2.600$ & $0.998$ & $0.982$ \\
+exp & $124/88$ & $4.438$ & $1.677$ & $1.085$ & $0.991$ & $1.057$ \\
+step & $44/30$ & $8.637$ & $2.929$ & $1.375$ & $0.995$ & $0.978$ \\
+step & $124/88$ & $1.642$ & $1.079$ & $1.009$ & $0.988$ & $0.936$ \\
+smooth & $44/30$ & $9.540$ & $3.307$ & $1.510$ & $1.000$ & $1.003$ \\
+smooth & $124/88$ & $2.730$ & $1.267$ & $1.027$ & $1.003$ & $1.058$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Exact-expectation depolarization yields larger exponential-pulse stress
+errors of $0.5753\pm0.0184$ at $p=10^{-3}$ and $0.6135\pm0.1210$ at
+$p=10^{-2}$ ($n=2$; Supplementary Table~S11). Across all cells the
+stress changes are modest (Table~\ref{tab:e4ratios}), not several-fold
+channel penalties. Small decreases do not establish beneficial noise.
+Temperature can behave differently: the smaller smooth-pulse circuit
+changes from $0.3249\pm0.0189$ clean to $1.2674\pm1.3552$ at
+$p=10^{-2}$ ($n=2$; Supplementary Table~S11).
+
+For a readout $z=\langle Z\rangle$ and $F=t(\alpha z+\beta)$,
+independent measurement statistics give
+\begin{equation}
+ \Var(\widehat F\mid z)=\frac{t^2\alpha^2(1-z^2)}N,
+ \qquad \delta F=t\alpha\,\delta z.
+ \label{eq:amplification}
+\end{equation}
+Individual trained gains vary strongly even within the selected pairs
+(Supplementary Table~S10). Large gains amplify fluctuations; offsets do
+not cancel them. Channel-induced bias also depends on the actual change
+in $z$ and the existing approximation error, explaining why large gains
+alone do not imply large depolarizing penalties. Selection by best clean
+E1 stress error limits these findings to the evaluated checkpoints.
+
+\subsection{Secondary wave speeds}
+\label{sec:secondary}
+
+Table~\ref{tab:gamma} reports the completed higher-wave-speed experiments
+and the same-seed subset of E1. The MLP retains lower mean temperature
+and stress errors than the circuit. Circuit stress error increases from
+$0.8274\pm0.2146$ at the original wave-speed parameter to
+$1.1971\pm0.4658$ and $1.4485\pm0.8240$ at the secondary values
+($n=3$; Table~\ref{tab:gamma}). Its largest individual error is $2.3413$
+(Supplementary Table~S17). The growing dispersion cautions against
+interpreting only the means.
+
+Every family has larger mean errors at the secondary speeds than in the
+full five-seed E1 table (Tables~\ref{tab:e1} and \ref{tab:gamma}), but this
+statement changes the seed population.
+With the same seeds, the MLP's stress mean improves from $0.2779$ to
+$0.2353$ at the intermediate speed (Table~\ref{tab:gamma}).
+Consequently, the evidence supports a preserved circuit/MLP ordering,
+not uniform degradation for every family and seed subset.
+
+The wave front reaches the outer boundary at $t=6/\sqrt\gamma$:
+$2$, $1.2$, and approximately $0.8571$ for the three tested values
+(Tables~\ref{tab:problem} and \ref{tab:gamma}). Exact temperature is
+independent of $\gamma$, so its changed learning errors reflect the coupled
+training problem. Increasing $\gamma$ changes the stress normalization,
+initial amplitude, and relative residual scaling. In particular,
+Eq.~\eqref{eq:loss} weights the squared unscaled stress-rate mismatch by
+$\gamma^{-2}$; the normalized rate target remains unchanged.
+Earlier front exit and changed loss scaling are relevant differences,
+not separately isolated causes of the observed errors. Rates were
+transferred without retuning, and timing shares the resource caveats
+of the overlapping campaign (Supplementary Tables~S3 and~S17).
+
+\begin{table}[htbp]
+\centering\small
+\caption{Secondary wave speeds: mean $\pm$ sample standard deviation of
+errors over seeds $0,1,2$ ($n=3$). The $\gamma=9$ rows are the same-seed
+subset of E1, not new runs. All runs use the exponential pulse and the
+E1 physics recipe; rates transfer from $\gamma=9$: $0.1$, except $0.01$
+for the reference. Circuit, MLP, spectral, and reference counts are
+$124/88$, $114/114$, $116/116$, and $12802/12802$, respectively.
+The reference is not parameter matched. Per-seed errors, times, and
+closure counts are retained in the supplement.}
+\label{tab:gamma}
+\begin{tabular}{rlll}
+\toprule
+$\gamma$ & Model & $e_T$ & $e_\sigma$ \\
+\midrule
+$9$ & VQC & $0.1910\pm0.0520$ & $0.8274\pm0.2146$ \\
+$9$ & MLP & $0.1164\pm0.0693$ & $0.2779\pm0.1511$ \\
+$9$ & Spectral & $0.1895\pm0.0683$ & $0.6309\pm0.2636$ \\
+$9$ & Reference & $0.0117\pm0.0038$ & $0.0488\pm0.0044$ \\
+\midrule
+$25$ & VQC & $0.2927\pm0.0458$ & $1.1971\pm0.4658$ \\
+$25$ & MLP & $0.1279\pm0.0525$ & $0.2353\pm0.1525$ \\
+$25$ & Spectral & $0.3180\pm0.0970$ & $0.6342\pm0.3302$ \\
+$25$ & Reference & $0.0221\pm0.0028$ & $0.1044\pm0.0357$ \\
+\midrule
+$49$ & VQC & $0.3868\pm0.1884$ & $1.4485\pm0.8240$ \\
+$49$ & MLP & $0.2468\pm0.0621$ & $0.4511\pm0.1311$ \\
+$49$ & Spectral & $0.4400\pm0.1898$ & $0.6894\pm0.2043$ \\
+$49$ & Reference & $0.0421\pm0.0014$ & $0.0956\pm0.0208$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Discussion}
+
+\subsection{What the comparisons establish}
+
+RQ1 has a negative descriptive answer under the executed recipe: the MLP
+has lower mean field errors in the nominal and output-affecting comparisons
+(Tables~\ref{tab:e1} and \ref{tab:e1b}). Output-affecting matching addresses
+known inert coordinates, while leaving capacity and optimization
+differences. The result neither invalidates favorable quantum-PINN
+comparisons on other equations and embeddings \citep{Berger2025} nor
+establishes an optimal classical or quantum architecture. Search-boundary
+choices and single-seed tuning further limit generalization.
+
+RQ2 supports increased scale of one full-objective gradient statistic,
+without an asymptotic trainability conclusion
+(Table~\ref{tab:e2summary}; Supplementary Table~S9). Its fixed readouts and input derivatives
+differ from qubit-indexed PDE discretizations \citep{Ukwatta2026}.
+RQ3 has a negative answer relative to the MLP over the tested budgets:
+no stress-efficiency advantage appears in parameter, collocation, or
+production training-label sweeps conditional on separately selected
+hyperparameters (Table~\ref{tab:e3}). The label axis excludes the fixed
+tuning overhead and production validation diagnostics; it does not measure
+total label-acquisition efficiency (Table~\ref{tab:training}). The shallow
+width sequence repeats one output family with different initialization,
+training, and simulation cost (Supplementary Section~S2).
+The spectral model is a weaker stress control
+and does not beat the circuit at every parameter target; the strongest
+negative comparison is with the MLP. Near equality of the deepest
+circuit's temperature mean does not establish parity for the coupled
+task. Supervised training demonstrates better attainable circuit stress
+accuracy, but the classical gap persists. These findings are restricted
+to the sampled architectures, transferred physics rates, and two seeds
+(Table~\ref{tab:e3}; Supplementary Table~S2). E1 provides the less
+contention-affected cost comparison; E3 timings cannot establish isolated
+compute scaling or project hardware speedups.
+
+\subsection{Representation, weighting, and classical alternatives}
+
+The spectral comparator tests a particular random basis, not a classical
+surrogate constructed from the trained circuit. It therefore cannot
+establish or refute dequantization \citep{Schreiber2023,Sahebi2025}.
+Trainable circuit encoding scales and fixed sampled frequencies differ
+substantially. More targeted spectral controls, learned frequencies, or
+surrogates of the fitted circuit would address different questions.
+
+Wave fronts and multiple temporal scales make frequency content relevant;
+Fourier-feature analyses of classical PINNs provide context
+\citep{WangFourier2021}. Unequal convergence of loss components is another
+documented PINN difficulty \citep{WangNTK2022}. Neither mechanism is
+diagnosed by the present field plots or aggregate losses. Adaptive
+weighting \citep{Setty2025} and alternative quantum embeddings
+\citep{TranEmbedding2026} merit controlled tests, rather than attribution
+of the observed errors to a single presumed representational limit.
+The supervised E3 result strengthens this distinction: the circuit's
+physics-only error is not a lower bound on its representation accuracy
+(Table~\ref{tab:e3}). It does not identify how much of the deficit arises
+from loss weighting, optimization, information access, or the initial-rate
+relaxation.
+
+\subsection{Readout amplification and limitations}
+
+Equation~\eqref{eq:amplification} makes unconstrained gains a practical
+inference concern even after exact-expectation training. Gain penalties,
+variance regularization, or shot-aware training could trade clean accuracy
+against sampling cost \citep{Kreplin2024}. E4 contains no intervention
+testing those remedies. Its fixed-checkpoint inference experiment is also
+distinct from noisy-gradient barren-plateau results \citep{WangNoise2021}.
+
+The study uses compact circuits and classical networks, far below many
+practical PINN sizes, simulated statevectors, and no hardware runs.
+Common iteration caps do not equalize derivative work or realized closure
+calls. Exact outer-boundary and validation information is available to
+every physics-trained family. The initial-rate strip leaves the continuum
+stress problem underdetermined. Its nonmonotone single-seed sensitivity
+differs across models: the declared cutoff gives the best tested stress
+outcome for the circuit and reference MLP but the worst for the matched
+MLP (Table~\ref{tab:xmin}). It is therefore neither a generally validated
+accuracy improvement nor a substitute for complete initial data.
+The dropped high-collocation circuit jobs, sparse efficiency replication,
+thread-sensitive reference replay, and overlapping execution conditions
+further limit scalability and timing conclusions (Supplementary
+Sections~S1 and~S9).
+The free-surface startup corner and rectangular switch-off interface also
+limit smooth strong-form approximation. Verification is pointwise at a
+single finite-difference resolution, not a uniform accuracy bound.
+The gradient study samples one derivative, while E4 selects clean-error
+minima and lacks repeated shot realizations. These restrictions define the
+scope of the negative comparison.
+
+\section{Conclusions}
+
+Under the declared tuning, sampling, and initial-rate recipe, the classical
+MLP achieves lower mean temperature and stress errors than the tested
+circuit in both nominal and output-affecting count comparisons
+(Tables~\ref{tab:e1} and \ref{tab:e1b}). The full physics objective raises
+a selected gradient variance, but its finite-size slopes do not establish
+barren-plateau mitigation (Table~\ref{tab:e2summary}; Supplementary Table~S9).
+The completed parameter, collocation, and production training-label
+sweeps show no circuit stress advantage over the MLP. The label comparison
+is conditional on separately selected hyperparameters and excludes tuning
+and diagnostic labels (Table~\ref{tab:training}). Supervision reveals better attainable circuit accuracy
+than the physics recipe achieved (Table~\ref{tab:e3}). Secondary speeds
+preserve the circuit/MLP ordering, with larger circuit stress dispersion
+(Table~\ref{tab:gamma}). Trained readout gains
+produce substantial finite-shot sensitivity in selected circuits, whereas
+the tested exact-expectation depolarization changes their stress errors
+modestly (Table~\ref{tab:e4ratios}).
+
+For laser processing, thermal-stress control, and thermal barrier coating
+assessment, the practical lesson is to verify stress initial data,
+normalization, field accuracy, and computational cost together. The
+corrected reference fields and explicit conversion to pascals support
+that verification. Extension to realistic materials requires complete
+initial-rate treatment and richer thermal-mechanical physics; this
+benchmark establishes neither quantum advantage nor a calibrated
+engineering design tool.
+
+%TC:ignore
+\section*{Data and code availability}
+The assembled archive \path{QPINN_LTE_release_v1_2026-10-21.zip}
+contains the analysis and reference code, all launchers and generators,
+parameter-audit and family-equivalence scripts, and the four verification
+scripts. Its \path{results/} directory contains the $440$ retained
+per-run JSON records collected in \path{runs_all.json}, each with its
+checkpoint, and $24$ further JSON files of other types: $10$ superseded
+per-run records from discarded launches (segregated, used by no table),
+the current and superseded E2/E4 aggregate files, three selected-rate
+summaries, and seven pilot and diagnostic files ($464$ JSON files in all).
+It also includes $456$ checkpoint state-dictionary files (\texttt{.pt},
+$6.9$ MB of content: $440$ retained, $10$ superseded, $6$ diagnostic), the E2
+aggregate records (\path{e2_exp_g9.json}), and the corrected
+checkpoint-labeled E4 records (\path{e4_noise.json}). Execution logs in
+\path{logs/} ($527$ files, $0.45$ MB) include queue dispatchers and the
+initial-rate weight-ablation logs and variants. The package contains results package v6, tables and figures,
+histories and closure counts, verification and audit outputs, the
+family-equivalence check, checkpoint gains, and selected rates
+(Supplementary Section~S1 and Table~S1). The \path{RELEASE_README}
+maps every manuscript table and figure to its inputs and generator and
+records regeneration commands and launcher thread settings; Supplementary
+Sections~S8--S9 give reconstruction details and individual E3 and
+secondary-speed outcomes. Repository: \url{https://github.com/Alqahtani921893/qpinn-laser-thermoelasticity-release}
+(release v1, 21 October 2026); the archived release receives a Zenodo DOI at
+acceptance.
+% Repository public since 21 Oct 2026 (author's decision); Zenodo DOI to be minted by the author at acceptance.
+
+\section*{CRediT}
+Hussain Al-Qahtani: Conceptualization, Methodology, Software, Validation,
+Formal analysis, Investigation, Writing---original draft,
+Writing---review and editing.
+
+\section*{Declaration of competing interests}
+The author declares no competing interests.
+
+\section*{Acknowledgements}
+The author acknowledges King Fahd University of Petroleum and Minerals
+(KFUPM) for institutional support. Generative AI assisted manuscript
+organization, language editing, and consistency checks. The author is
+responsible for the scientific content, source verification, and final text.
+
+\appendix
+\section{Corrected closed-form solution and verification}
+\label{app:exact}
+
+The expressions below define the exact reference; Supplementary
+Section~S7 gives the correction inventory and executed pointwise checks.
+The transformed initial-rate terms must be retained before cancellation.
+
+\subsection{Transform solution and the initial stress rate}
+
+Let $\widehat f(s)=\mathcal L[f](s)$, $a=\sqrt\gamma$, and
+$\tau=x/a$, using the branch of $\sqrt s$ positive on the positive real axis.
+Zero initial fields and
+$T_t(x,0^+)=e^{-x}f(0^+)$ together with
+$\sigma_t(x,0^+)=-\gamma e^{-x}f(0^+)$ give
+\begin{equation}
+ \widehat\sigma_{xx}-\frac{s^2}{\gamma}\widehat\sigma
+ =s^2\widehat T.
+\end{equation}
+The initial-rate terms on the two sides cancel. Solving the spatial boundary
+value problems gives
+\begin{align}
+ \widehat T(x,s)
+ &=\widehat f(s)\left[
+ \frac{e^{-x}}{s-1}-\frac{e^{-x\sqrt s}}{\sqrt s(s-1)}\right],\\
+ \widehat\sigma(x,s)
+ &=\widehat f(s)\left[
+ \mathcal{A}(s)\bigl(e^{-x}-e^{-s\tau}\bigr)
+ -\mathcal{B}(s)\bigl(e^{-x\sqrt s}-e^{-s\tau}\bigr)\right],\\
+ \mathcal{A}(s)&=\frac{\gamma s^2}{(s-1)(\gamma-s^2)},\qquad
+ \mathcal{B}(s)=\frac{\gamma\sqrt s}{(s-1)(\gamma-s)}.
+\end{align}
+The apparent positive poles at $s=1$, $s=a$, and $s=\gamma$ cancel in
+the complete expression, so they do not produce growing physical modes.
+At $s=1$ the cancellation is between terms; at $s=a$ and $s=\gamma$
+the corresponding exponential differences vanish. The analogous assertion
+that the first difference vanishes at $s=-a$ would be incorrect.
+
+\subsection{Exponential response and pulse superposition}
+
+Let $\mathcal T_\beta$ and $\mathcal S_\beta$ denote the responses to
+$e^{-\beta t}H(t)$, with unit amplitude. For $t>0$, define
+\begin{align}
+ \xi&=\frac{x}{2\sqrt t},\qquad \eta=\sqrt{\beta t},\\
+ J_\beta(x,t)&=e^{-\beta t}
+  \operatorname{Im}\left[e^{i\sqrt\beta x}
+     \operatorname{erfc}(\xi+i\eta)\right],\\
+ C_1&=\frac{\gamma}{(\gamma-1)(1+\beta)},&
+ C_2&=\frac{\gamma}{(\gamma-1)(\gamma+\beta)},&
+ C_3&=-\frac{\gamma}{(1+\beta)(\gamma+\beta)},\\
+ r_+&=-\frac{\gamma a}{2(a-1)(a+\beta)},&
+ r_-&=\frac{\gamma a}{2(a+1)(a-\beta)},&
+ r_\beta&=\frac{\gamma\beta^2}{(1+\beta)(\beta^2-\gamma)}.
+\end{align}
+For $\beta>0$,
+\begin{equation}
+ \mathcal T_\beta(x,t)=\frac{1}{1+\beta}\left[
+ \frac{e^{t-x}}{2}\operatorname{erfc}(\sqrt t-\xi)
+ +\frac{e^{t+x}}{2}\operatorname{erfc}(\sqrt t+\xi)
+ -e^{-x-\beta t}-\frac{J_\beta(x,t)}{\sqrt\beta}\right].
+ \label{eq:corrected-T}
+\end{equation}
+The stress can be written without the canceling Gaussian terms, since
+$C_1-C_2+C_3=0$. Define
+\begin{align}
+ P_1(x,t)&=\frac12\left[
+ e^{t+x}\operatorname{erfc}(\xi+\sqrt t)
+ +e^{t-x}\operatorname{erfc}(\sqrt t-\xi)\right],\\
+ P_a(x,t)&=\frac a2\left[
+ e^{\gamma t-a x}\operatorname{erfc}(\xi-a\sqrt t)
+ -e^{\gamma t+a x}\operatorname{erfc}(\xi+a\sqrt t)\right],\\
+ R_\beta(t)&=r_\beta e^{-\beta t}+r_+e^{at}+r_-e^{-at},\\
+ D_\beta(z)&=C_1 e^z\operatorname{erfc}(\sqrt z)
+ +aC_2e^{\gamma z}\operatorname{erf}(a\sqrt z)
+ +C_3\sqrt\beta e^{-\beta z}\operatorname{erfi}(\sqrt{\beta z})
+ +R_\beta(z).
+\end{align}
+Then
+\begin{equation}
+ \mathcal S_\beta(x,t)=C_1P_1(x,t)+C_2P_a(x,t)
+ -C_3\sqrt\beta J_\beta(x,t)+e^{-x}R_\beta(t)
+ -H(t-\tau)D_\beta(t-\tau).
+ \label{eq:corrected-stress}
+\end{equation}
+The delayed term is evaluated only for $t>\tau$ and extended continuously
+at the front. The formulas are interpreted by limits at coincident poles,
+including $\gamma=1$ and $\gamma=\beta^2$. The supplied numerical
+implementation does not implement these general limiting cases; the
+benchmark parameters in Table~\ref{tab:problem} avoid them. The unit-step stress is
+$\mathcal S_0=\lim_{\beta\to0^+}\mathcal S_\beta$.
+For the temperature this limit is explicitly
+\begin{align}
+ \mathcal T_0(x,t)={}&-e^{-x}
+ +\frac{e^{t-x}}2\operatorname{erfc}(\sqrt t-\xi)
+ +\frac{e^{t+x}}2\operatorname{erfc}(\sqrt t+\xi)\notag\\
+ &+2\sqrt{\frac t\pi}e^{-\xi^2}
+ -x\operatorname{erfc}(\xi).
+\end{align}
+All responses vanish for nonpositive time. For either field
+$\mathcal F\in\{\mathcal T,\mathcal S\}$, the benchmark pulses follow by
+linearity:
+\begin{align}
+ F_{\rm exp}(x,t)&=A_e\mathcal F_\beta(x,t),\\
+ F_{\rm step}(x,t)&=A_s\left[\mathcal F_0(x,t)
+ -H(t-\Delta)\mathcal F_0(x,t-\Delta)\right],\\
+ F_{\rm smooth}(x,t)&=A\left[\mathcal F_{\beta_1}(x,t)
+ -\mathcal F_{\beta_2}(x,t)\right].
+\end{align}
+For pulses nonzero at startup, the delayed stress response has a derivative
+discontinuity at $x=at$. The rectangular pulse also launches a delayed
+front from its switch-off time. The smooth pulse cancels the leading
+startup discontinuity because $f(0^+)=0$.
+
+For numerical evaluation, the identity
+$e^{c^2t\pm cx}\operatorname{erfc}(\xi\pm c\sqrt t)
+=e^{-\xi^2}\operatorname{erfcx}(\xi\pm c\sqrt t)$
+is useful, but negative large arguments and cancellation between delayed
+terms still require analytic regrouping. In particular, replacing every
+factor individually by a scaled complementary error function does not
+by itself remove all large intermediate terms. The released reference
+implementation regroups the canceling $e^{\gamma t}$
+contributions behind the front.
+
+\FloatBarrier
+\bibliographystyle{plainnat}
+\bibliography{refs}
+%TC:endignore
+\end{document}

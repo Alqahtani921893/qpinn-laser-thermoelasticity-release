@@ -1,0 +1,36 @@
+File: main.tex
+Encoding: ascii
+Sum count: 7018
+Words in text: 5171
+Words in headers: 82
+Words outside text (captions, etc.): 896
+Number of headers: 26
+Number of floats/tables/figures: 6
+Number of math inlines: 853
+Number of math displayed: 16
+Subcounts:
+  text+headers+captions (#headers/#floats/#inlines/#displayed)
+  217+1+0 (1/0/0/0) _top_
+  58+1+0 (1/0/0/0) Section: Highlights
+  523+1+0 (1/0/0/0) Section: Introduction
+  0+5+0 (1/0/0/0) Section: Problem statement and exact solution
+  149+5+0 (1/0/12/5) Subsection: Physical assumptions and dimensional conversion
+  163+5+18 (1/0/39/1) Subsection: Pulses, reference fields, and interfaces
+  95+4+0 (1/0/1/0) Subsection: Truncation and supplied information
+  0+3+0 (1/0/0/0) Section: Models and training
+  300+4+26 (1/0/40/2) Subsection: Circuit and classical comparators
+  531+6+85 (1/0/106/4) Subsection: Hard initial fields and physics objective
+  295+5+0 (1/0/8/0) Subsection: Training, tuning, and computational accounting
+  280+4+9 (1/0/27/3) Subsection: Metrics and diagnostic protocols
+  0+1+0 (1/0/0/0) Section: Results
+  335+5+223 (1/2/199/0) Subsection: Nominal and output-affecting parameter comparisons
+  149+2+95 (1/1/34/0) Subsection: Gradient variance
+  823+8+338 (4/3/256/0) Subsection: Efficiency
+  208+4+36 (1/0/67/1) Subsection: Noise and readout sensitivity
+  228+3+66 (1/0/64/0) Subsection: Secondary wave speeds
+  0+1+0 (1/0/0/0) Section: Discussion
+  253+4+0 (1/0/0/0) Subsection: What the comparisons establish
+  152+5+0 (1/0/0/0) Subsection: Representation, weighting, and classical alternatives
+  219+4+0 (1/0/0/0) Subsection: Readout amplification and limitations
+  193+1+0 (1/0/0/0) Section: Conclusions
+

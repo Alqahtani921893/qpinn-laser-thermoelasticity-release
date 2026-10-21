@@ -1,0 +1,26 @@
+File: supp.tex
+Encoding: ascii
+Sum count: 7308
+Words in text: 4987
+Words in headers: 63
+Words outside text (captions, etc.): 808
+Number of headers: 13
+Number of floats/tables/figures: 0
+Number of math inlines: 1450
+Number of math displayed: 0
+Subcounts:
+  text+headers+captions (#headers/#floats/#inlines/#displayed)
+  0+10+0 (1/0/0/0) _top_
+  984+5+50 (1/0/28/0) Section: Reproducibility note and evidence inventory
+  436+2+42 (1/0/104/0) Section: Parameter accounting
+  872+5+172 (1/0/426/0) Section: Hyperparameters, tuning, and resource accounting
+  262+6+100 (1/0/209/0) Section: Additional field errors and initial-rate ablation
+  160+3+98 (1/0/115/0) Section: Complete gradient-variance grid
+  298+6+155 (1/0/383/0) Section: Selected checkpoints and complete noise results
+  64+2+0 (1/0/0/0) Section: Corrected-solution verification
+  510+5+119 (1/0/71/0) Subsection: Reference-solution corrections and executed verification
+  479+4+0 (1/0/1/0) Section: Run commands and reconstruction
+  0+5+0 (1/0/0/0) Section: Efficiency and secondary-speed per-run records
+  643+4+51 (1/0/95/0) Subsection: E3: all executed runs
+  279+6+21 (1/0/18/0) Subsection: Secondary wave speeds: all executed runs
+

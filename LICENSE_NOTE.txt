@@ -1,2 +1,5 @@
-Proposed licensing (to be confirmed by the author before deposit): code under the MIT License; run records, checkpoints,
-logs and tables under CC BY 4.0. Replace this note with the chosen licence texts at deposit.
+Licensing of this release (21 Oct 2026)
+- Code (analysis/*.py, analysis/*.sh): MIT License (see LICENSE).
+- Run records, checkpoints, logs, tables, figures, manuscript sources and documentation (analysis/results, analysis/logs,
+  package/, manuscript_source/): Creative Commons Attribution 4.0 International (CC BY 4.0),
+  https://creativecommons.org/licenses/by/4.0/ . Please cite the article and this release when reusing them.

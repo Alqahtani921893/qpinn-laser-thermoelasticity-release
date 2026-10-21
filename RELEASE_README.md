@@ -23,11 +23,11 @@ ablation, auxiliary E3 queue 2; E4 evaluator 4).
                                    by any table.
 - analysis/logs/                   execution logs of every launcher, queue dispatcher outputs, the initial-rate weight
                                    ablation (logs/variants) and the pilot / diagnostic runs
-- manuscript_source/              manuscript v7 sources (v6 + repository address; main.tex, supp.tex, refs.bib, figures/), the compiled PDFs and the executed
-                                   TeXcount reports (texcount_v6_main.txt: `texcount -sum -merge main.tex`, whose %TC:ignore
-                                   boundaries exclude the title block and everything after Conclusions; texcount_v6_supp.txt;
+- manuscript_source/              manuscript v8 sources (v6 + repository address + specific AI disclosure; main.tex, supp.tex, refs.bib, figures/), the compiled PDFs and the executed
+                                   TeXcount reports (texcount_v8_main.txt: `texcount -sum -merge main.tex`, whose %TC:ignore
+                                   boundaries exclude the title block and everything after Conclusions; texcount_v8_supp.txt;
                                    texcount_v6_abstract.txt from the abstract environment alone), and previous_versions/ with the
-                                   v5 and v6 PDFs and sources reviewed in rounds 3-5
+                                   v5, v6 and v7 PDFs and sources reviewed in rounds 3-6
 - package/                         results_package_README.md (authoritative protocol description), results_tables.md and
                                    results_package_v6.md (all tables), runs_all.json (440 records with histories), figures/,
                                    verification_log_closed_form.txt, functional_parameter_audit.txt, family_equivalence_check.txt,

@@ -1,11 +1,22 @@
 {
   "title": "Quantum and classical physics-informed networks for laser-pulse thermoelasticity: code, run records, checkpoints and reproducibility package (release v1)",
   "upload_type": "software",
-  "description": "Analysis code, exact-solution module, launchers, every per-run record (440 retained runs with loss histories and L-BFGS closure counts) and trained checkpoint, execution logs, the results package (tables, figures, verification and audit outputs) and the manuscript sources for the benchmark of variational quantum circuits against classical networks on the one-dimensional laser-pulse thermoelastic problem. RELEASE_README.md maps every manuscript table and figure to its inputs and generator.",
-  "creators": [{"name": "Al-Qahtani, Hussain", "affiliation": "King Fahd University of Petroleum and Minerals (KFUPM)"}],
-  "keywords": ["physics-informed neural networks", "quantum machine learning", "variational quantum circuits", "laser heating", "thermoelasticity", "benchmark"],
+  "description": "Analysis code, exact-solution module, launchers, every per-run record (440 retained runs with loss histories and L-BFGS closure counts) and trained checkpoint, execution logs, the results package (tables, figures, verification and audit outputs) and the manuscript sources for the benchmark of variational quantum circuits against classical networks on the one-dimensional laser-pulse thermoelastic problem. RELEASE_README.md maps every manuscript table and figure to its inputs and generator. The manuscript's availability statement names this repository; the Zenodo DOI of the archived release is minted at acceptance and will be added to the statement.",
+  "creators": [
+    {
+      "name": "Al-Qahtani, Hussain",
+      "affiliation": "King Fahd University of Petroleum and Minerals (KFUPM)"
+    }
+  ],
+  "keywords": [
+    "physics-informed neural networks",
+    "quantum machine learning",
+    "variational quantum circuits",
+    "laser heating",
+    "thermoelasticity",
+    "benchmark"
+  ],
   "license": "MIT",
   "access_right": "open",
-  "version": "v1 (21 Oct 2026)",
-  "notes": "Author to confirm creators, affiliation, ORCID and licence before deposit; the manuscript's availability statement cites this record's DOI."
+  "version": "v1 (21 Oct 2026)"
 }
