@@ -1,10 +1,4 @@
-
-!!! Reached end of file while waiting for %TC:endignore. !!!
-
-!!! Reached end of file while waiting for \end. !!!
-
-!!! Environment ended while waiting for nd{document}. !!!
-File: main_count_scope.tex
+File: main.tex
 Encoding: ascii
 Sum count: 7018
 Words in text: 5171
@@ -40,4 +34,3 @@ Subcounts:
   219+4+0 (1/0/0/0) Subsection: Readout amplification and limitations
   193+1+0 (1/0/0/0) Section: Conclusions
 
-(errors:3)

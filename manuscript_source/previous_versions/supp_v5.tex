@@ -1,0 +1,1209 @@
+% Supplement to manuscript v5: targeted corrections following referee round 2.
+\documentclass[11pt]{article}
+%TC:envir table 0 1
+%TC:envir tabular 1 1
+%TC:envir longtable 1 1
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[margin=25mm]{geometry}
+\usepackage{amsmath,amssymb,graphicx,booktabs,longtable,array}
+\usepackage[authoryear,round]{natbib}
+\usepackage[hidelinks]{hyperref}
+\usepackage{url,placeins}
+\setlength{\emergencystretch}{2em}
+\newcommand{\dd}{\mathrm d}
+\DeclareMathOperator{\Var}{Var}
+\DeclareMathOperator{\erf}{erf}
+\DeclareMathOperator{\erfc}{erfc}
+\DeclareMathOperator{\erfi}{erfi}
+\DeclareMathOperator{\erfcx}{erfcx}
+
+\renewcommand{\thesection}{S\arabic{section}}
+\renewcommand{\thesubsection}{\thesection.\arabic{subsection}}
+\renewcommand{\thetable}{S\arabic{table}}
+\renewcommand{\thefigure}{S\arabic{figure}}
+\renewcommand{\theequation}{S\arabic{equation}}
+\title{Supplementary material: Quantum and classical physics-informed
+networks for laser-pulse thermoelasticity}
+\author{Hussain Al-Qahtani}
+\date{}
+\begin{document}
+\maketitle
+
+\section{Reproducibility note and evidence inventory}
+
+The internally prespecified brief posed descriptive research questions
+without formal statistical hypotheses or equivalence margins. Execution
+expanded the learning-rate grid, added L-BFGS, and used exact outer-boundary
+traces and a near-surface exclusion for both initial-rate penalties. E1b
+adds retuned classical comparisons after identifying inert circuit
+coordinates. Table~\ref{tab:inventory} identifies the complete evidence:
+all earlier per-run records are unchanged, and all retained E3 and
+secondary-wave-speed cells contain their declared seeds.
+
+The versioned archive is
+\path{QPINN_LTE_release_v1_2026-10-21.zip}. Its analysis directory contains
+\path{qpinn_local.py}, \path{ground_truth.py}, \path{noise_eval.py},
+\path{run_e4.py}, all launchers, \path{select_lrs.py},
+\path{functional_count.py}, \path{family_equivalence.py}, the four
+exact-solution verification scripts, and the table, figure, and record
+generators. The results directory contains $464$ per-run JSON records:
+$440$ retained records collected in \path{runs_all.json} and $24$
+segregated \texttt{*\_superseded\_*} launch records used by no table.
+It also contains the trained checkpoint state dictionaries
+($456$ \texttt{.pt} files, $7.8\,\mathrm{MB}$), full-precision E2
+aggregate records in \path{e2_exp_g9.json}, and corrected,
+checkpoint-labeled E4 records in \path{e4_noise.json}.
+The logs directory ($2.2\,\mathrm{MB}$) includes execution logs, queue
+dispatcher outputs, and the initial-rate weight-ablation logs and variants.
+The package contains the tables and figures, \path{runs_all.json} with
+training histories and closure counts, verification log, coordinate-audit
+output, family-equivalence check, checkpoint gains, and selected rates.
+\path{RELEASE_README} maps every manuscript table and figure to its input
+files and generator and gives regeneration commands and launcher thread
+settings. Table~\ref{tab:inventory} separates the retained analysis records
+from the provenance-only launches. The archive E2 file corresponds to the
+package input \path{e2_gradvar.json}; individual E2 gradient draws were not
+retained and are distinct from these aggregate records.
+% Author: insert the reviewer-accessible repository address and persistent DOI
+% at submission, and confirm that the deposited archive is this release version.
+Repository address/DOI: \textit{to be inserted by the author at submission}.
+
+\path{results_package_v6.md} is the current executed-results description;
+its numerical tables are unchanged. Its protocol prose and captions use
+the single-seed initial-rate ablation values, distinguish the smallest
+searched spectral width from the architecture's possible minimum, give
+comparator deviations separately, and avoid inferring representational
+impossibility or unchanged gradient-variance decay. The corrected
+\path{closed_form_appendix.md} and \path{ground_truth.py} header separate
+the pulse-specific finite-difference maxima, printed inverse-transform
+agreement, smooth-pulse discrepancy, and stored-reference regression
+check, consistently with Table~\ref{tab:supp-verification-results}.
+All are pointwise checks, not a uniform accuracy bound.
+
+The E4 records use the corrected stress-output mapping; the earlier
+incorrect evaluator outputs are excluded. The table generator groups by
+pulse, wave speed, circuit, channel probability, and shot budget.
+Clean controls share the noise grid and checkpoints. The verification-code
+comments distinguish zero initial elastic-strain rate from nonzero
+initial stress rate. The selected readout gains reported here come from
+the checkpoint state-dictionary audit in the archive.
+
+Initial E3 and secondary-speed jobs with hard-coded rates were discarded
+before use, and their outputs are segregated. Completed physics sweeps
+transfer the E1 exponential-pulse rates; new circuit architectures were
+not independently retuned. Data-only rates were selected separately.
+The circuit collocation jobs at $N_c=4096$ were stopped and dropped for
+cost; this is a declared deviation from the plan (main Section~4.3). The auxiliary dispatcher skips a job when its
+log exists, so completion was checked using the actual per-cell records,
+not its end marker. Its adjustable worker file and overlapping queues
+prevent treating all recorded durations as comparable throughput.
+
+\begin{table}[htbp]
+\centering\small
+\caption{Final evidence inventory. Counts denote records, checkpoint files, or reported
+individual runs, not independent experiments across all rows. E1b reuses
+E1 circuit results and repeats the smaller spectral model. E3 repeats the
+E1 settings for its anchor configurations and repeats the classical
+architectures associated with the two nominal-count-$84$ circuit rows.}
+\label{tab:inventory}
+\begin{tabular}{p{0.31\linewidth}rp{0.55\linewidth}}
+\toprule
+Source/group & Count & Content \\
+\midrule
+\path{runs_all.json}: e1 & 105 & Main production runs \\
+\quad fmatch & 60 & Classical E1b production runs \\
+\quad ablation\_xmin & 9 & Five reference, two MLP, two circuit runs \\
+\quad ablation\_repro & 1 & Reference replay at E1 thread setting \\
+\quad e3 & 66 & 36 parameter, 14 collocation, 16 label runs \\
+\quad gamma & 24 & Two speeds, four models, three seeds \\
+\quad lrsel & 105 & E1 learning-rate candidates \\
+\quad lrsel\_fmatch & 60 & E1b candidates \\
+\quad lrsel\_e3\_data & 10 & Data-only candidates \\
+Total in \path{runs_all.json} & 440 & Histories and closure counts retained \\
+Segregated superseded launches & 24 & Provenance only; used by no table \\
+Total per-run JSON files & 464 & Retained plus superseded launches \\
+Checkpoint state dictionaries & 456 & \texttt{.pt} files, $7.8\,\mathrm{MB}$ total \\
+Execution logs & --- & $2.2\,\mathrm{MB}$; includes dispatcher and ablation logs \\
+\path{e2_gradvar.json} & 81 & Aggregate variance cells \\
+Corrected \path{e4_noise.json} & 144 & Selected-checkpoint conditions \\
+Initial-rate weight ablation & 6 & Log-derived, not in \path{runs_all.json} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The reference-MLP cutoff-$0.3$ ablation used a different thread setting
+from E1. Its recorded Adam history is identical, but its L-BFGS endpoint
+is not. The new replay at the E1 setting reproduces all recorded numerical
+histories, errors, validation values, and closure counts exactly; elapsed
+time and record identifiers naturally differ (main Table~4).
+The E3 anchor reruns and repeated classical architectures also reproduce
+their numerical outcomes. Some anchor reruns used the auxiliary queue's
+thread setting, demonstrating that the observed thread dependence is
+not universal across the tested models (Table~\ref{tab:settings}; main Table~4). These checks establish reproducibility of the reported
+repeats, not a guarantee of bitwise determinism for every run or platform.
+
+The reference ablation has stress error $0.0496$ after $1060$ closures
+with $2$ threads; the E1 run and its replay give $0.0461$ after $1065$
+closures with $3$ threads (main Table~4). Twelve E3 anchor records
+(two configurations, three families, two seeds) reproduce their E1
+numerical histories and outcomes. The classical networks associated with
+the two nominal-count-$84$ targets also repeat their outcomes (main
+Section~4.3 and the E3 per-seed tables). These repeated executions are not
+extra independent seeds.
+
+A plausible explanation is that intra-op parallel reductions become
+relevant only for sufficiently large tensor operations. The reference
+network's fixed L-BFGS batch has $2048$ points and width $64$, whereas its
+Adam batch has $512$ points (main Tables~2--3). A thread-dependent
+floating-point summation order could then create small gradient changes
+that the strong-Wolfe search amplifies into a different endpoint.
+This interpretation is consistent with the phase-specific discrepancy
+and smaller-model repetitions, but the operation-level reduction policy,
+its grain-size threshold, and the amplification mechanism were not
+separately instrumented or tested. The source declarations below are not
+per-run measurements of effective thread use.
+
+\section{Parameter accounting}
+
+Table~\ref{tab:extended-counts} gives circuit nominal and reported
+output-affecting counts and the nearest nominal-count classical designs.
+Signed deviation is $100(P_{\rm classical}/P_{\rm target}-1)$.
+For classical models the displayed output count equals the nominal count
+under the convention that no coordinates have been structurally removed;
+this is not an empirical rank claim. The released \path{functional_count.py} audits every registered scalar
+at model-initialization seed $0$, with $64$ input pairs drawn uniformly
+from $[-1,1]^2$ using a separate input generator seeded with $12345$.
+Each scalar is changed by $+0.37$ while all others are held fixed and
+then restored; a coordinate is classified as inert if the largest
+absolute change of either output is below $10^{-12}$. The script's
+executed output, \path{functional_parameter_audit.txt}, reports every
+inert layer/qubit coordinate and the totals in
+Table~\ref{tab:extended-counts}. Layer and qubit indices in that file
+start at zero. The test includes encoding scales, rotation angles,
+and affine readout parameters; the perturbation is an angle increment
+only for the rotation coordinates. No readout coordinate is classified
+as inert. Individual numerical changes are not printed by this script.
+These counts describe output-affecting coordinates at the tested
+initialization and inputs, not a measured Jacobian rank, intrinsic
+function-space dimension, or proof that all remaining coordinates are
+independent.
+
+For $L=2$, the $4$-, $6$-, and $8$-qubit circuits realize the same output
+function family under the qubit relabeling
+$\{0,1,2,3\}\leftrightarrow\{0,1,2,n_q-1\}$.
+The last CZ ring commutes with each measured $Z$ and cancels in its
+expectation. Conjugation through the preceding CZ ring couples the
+measured qubits $0$ and $1$ only to their ring neighbors $2$ and $n_q-1$;
+all other local gates cancel from those expectations. This leaves the
+same active-coordinate dependence for each width, with the $30$
+output-affecting coordinates in Table~\ref{tab:extended-counts}.
+The executed \path{family_equivalence.py} check transplants encoding
+scales, rotation angles, and affine readouts of the $4$-qubit circuit
+onto these qubits of the wider circuits. On $64$ random input pairs,
+\path{family_equivalence_check.txt} reports maximum absolute raw-output
+differences of $5.55\times10^{-16}$ and $8.88\times10^{-16}$ for $6$ and
+$8$ qubits. The same transplantation at $L=4$ gives $0.811$ and $0.848$;
+this control shows that the transplantation is no longer output-preserving
+at that depth (Table~\ref{tab:settings}). The numerical check supports
+the exact cancellation argument; it is not a measured functional rank.
+Consequently, the E3
+$L=2$ stress sequence $1.0127$, $1.4455$, $2.0390$ represents differently
+initialized and trained realizations of one output family, with different
+simulation cost, and is not a capacity trend (main Table~9).
+Section~\ref{supp:reconstruction} gives the archived check and command.
+
+\begin{table}[htbp]
+\centering\scriptsize
+\caption{Circuit counts and E3 nearest nominal-count comparator designs.
+$\Delta_n=100(P/P_{\rm nom}-1)$ and $\Delta_o=100(P/P_{\rm out}-1)$
+are classical-count deviations from the corresponding circuit counts.
+$P/P$ for classical models denotes the convention that no coordinates
+have been removed, not a Jacobian-rank estimate. MLP matches to targets
+$64$ and $84$ exceed the prespecified $10\%$ tolerance.}
+\label{tab:extended-counts}
+\begin{tabular}{rccrrcrr}
+\toprule
+$(n_q,L)$ & VQC $P_{\rm nom}/P_{\rm out}$ & MLP $P/P$ & $\Delta_n$ & $\Delta_o$ & Spectral $P/P$ & $\Delta_n$ & $\Delta_o$ \\
+ & & & (\%) & (\%) & & (\%) & (\%) \\
+\midrule
+$4,2$ & $44/30$ & $42/42$ & $-4.55$ & $+40.00$ & $40/40$ & $-9.09$ & $+33.33$ \\
+$4,4$ & $84/70$ & $93/93$ & $+10.71$ & $+32.86$ & $78/78$ & $-7.14$ & $+11.43$ \\
+$6,2$ & $64/30$ & $57/57$ & $-10.94$ & $+90.00$ & $59/59$ & $-7.81$ & $+96.67$ \\
+$6,4$ & $124/88$ & $114/114$ & $-8.06$ & $+29.55$ & $116/116$ & $-6.45$ & $+31.82$ \\
+$6,8$ & $244/208$ & $249/249$ & $+2.05$ & $+19.71$ & $249/249$ & $+2.05$ & $+19.71$ \\
+$8,2$ & $84/30$ & $93/93$ & $+10.71$ & $+210.00$ & $78/78$ & $-7.14$ & $+160.00$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The E1 nominally matched MLP counts exceed circuit output counts by
+$40.00\%$ and $29.55\%$; spectral counts exceed them by $33.33\%$ and
+$31.82\%$ (Table~\ref{tab:extended-counts}). E1b reduces the MLP deviations
+to $-3.33\%$ and $+5.68\%$ (main Table~7). Its smaller spectral model
+is not matched, while the larger differs by $+10.23\%$. The implemented
+spectral search starts at width $2$, giving $40$ parameters; width $1$
+would give $21$ but was not searched (main Tables~2 and~7).
+
+\FloatBarrier
+\section{Hyperparameters, tuning, and resource accounting}
+
+\begingroup\small
+\setlength{\LTcapwidth}{\textwidth}
+\begin{longtable}{p{0.31\linewidth}p{0.60\linewidth}}
+\caption{Detailed settings from the released code and declared execution
+environment. Launcher settings can be overridden and are not recorded
+within each JSON run. Main Table~3 gives the sampling distribution and
+loss weights.}
+\label{tab:settings}\\
+\toprule
+Item & Setting \\
+\midrule\endfirsthead
+\toprule Item & Setting \\
+\midrule\endhead
+\midrule\multicolumn{2}{r}{Continued on next page}\\\endfoot
+\bottomrule\endlastfoot
+Machine and arithmetic & Apple M2 Max, $12$ CPU cores;
+\texttt{float64}/\texttt{complex128}; no accelerator \\
+Software & Python 3.12.5; PyTorch 2.9.1; NumPy 2.5.1; SciPy 1.16.3 \\
+E1 / rate selection & \texttt{OMP\_NUM\_THREADS=3}; E1 uses $3$--$4$ concurrent processes \\
+E1b launcher & \texttt{OMP\_NUM\_THREADS=2}, up to $3$ processes \\
+Cutoff launcher & Threads $2$; reference serial, other jobs up to $4$ \\
+E3 main / auxiliary & Threads $3/2$; main default workers $3$;
+auxiliary v2 reads \path{logs/e3/aux_workers}, default $4$ \\
+E3 timing overlap & Author reports $7$--$11$ concurrent processes
+for late circuit runs, load averages up to $161$ on $12$ cores;
+times are contention-affected observed durations, unsuitable for
+isolated-throughput comparisons \\
+Dropped E3 jobs & VQC at $N_c=4096$, seeds $0,1$;
+$4N_c=16384$ fixed L-BFGS points; stopped after $2100\,\mathrm{s}$,
+projected about $32400\,\mathrm{s}$ per seed; no completed result \\
+Secondary-speed launcher & Threads $3$, default workers $3$ \\
+E4 evaluation & Threads $4$, author-declared execution setting;
+\path{run_e4.py} itself does not assign the thread variable \\
+Adam & $2000$ steps; cosine factor decays to $0.05$;
+library-default momentum and stabilizer settings \\
+L-BFGS & Step size $1$; strong Wolfe; history $50$;
+max iterations $1000$; max evaluations $1250$;
+gradient tolerance $10^{-12}$; change tolerance $10^{-14}$ \\
+L-BFGS points & Fixed $4N_c$ collocation points and $512$ shared
+boundary times; main E1/E1b $N_c=512$ per Adam step \\
+Rate selection & Five candidates, seed $100$, Adam $1000$ steps,
+no L-BFGS; fixed $2000$ random validation points \\
+Recorded history & Every $500$ Adam steps, plus final L-BFGS record;
+\texttt{hist[-1].lbfgs\_evals} counts closures when L-BFGS is used \\
+Data-only sweep & $2000$ Adam steps, no L-BFGS; fixed production
+training labels; no collocation or boundary loss \\
+Data-only tuning labels & Rates selected once at $N_d=256$ using
+$256$ exact training samples and $2000$ exact validation samples,
+shared by the five candidate rates; excluded from the production $N_d$ axis \\
+Production validation & $2000$ exact diagnostic samples per run;
+no update or checkpoint-selection role \\
+Data-only unused precomputation & The shared training routine also
+constructs $4096$ exact boundary samples; the data-only objective does not use them \\
+Family-equivalence check & $64$ random input pairs; transplant from
+$4$ qubits to $6/8$ qubits on indices $0,1,2,n_q-1$;
+raw-output maxima $5.55\times10^{-16}/8.88\times10^{-16}$ at $L=2$
+and $0.811/0.848$ at $L=4$; executed \path{family_equivalence_check.txt} \\
+\end{longtable}
+\endgroup
+
+\FloatBarrier
+Table~\ref{tab:lr-candidates} reports every final candidate score, defined
+as the sum of the two relative validation errors. All selected values
+minimize their recorded candidate scores and agree with production rates.
+The full JSON retains intermediate Adam scores. Search-boundary selections
+limit any claim of optimal tuning. E3 physics and secondary-speed runs
+transfer the E1 exponential rates; data-only rates transfer from their
+separately selected label count. Thus E3 is a production training-label
+sweep conditional on separately selected hyperparameters. Its fixed
+tuning overhead is $256$ exact training samples plus $2000$ exact
+validation samples shared by the five candidate rates at $N_d=256$
+(Table~\ref{tab:settings}). The tuning seed also makes these samples
+common to both model families. Production runs compute validation
+diagnostics, but those values neither drive parameter updates nor select
+checkpoints; the final state is saved. The plotted $N_d$ is therefore
+not a count of all exact-solution queries or total label-acquisition cost.
+In particular, the shared routine constructs unused exact boundary data
+also in the data-only regime (Table~\ref{tab:settings}); the stated tuning
+overhead counts the exact samples used for training and rate selection.
+
+\begingroup
+\scriptsize
+\setlength{\tabcolsep}{2.5pt}
+\setlength{\LTcapwidth}{\textwidth}
+\begin{longtable}{llllrrrrrrr}
+\caption{Complete final validation scores for the five learning-rate candidates. Each candidate uses seed $100$ and $1000$ Adam steps ($n=1$ per candidate), so no replicate standard deviation is available. The selected rate minimizes the recorded validation score; all E1 and E1b selections agree with their executed rates. An asterisk marks a search-boundary choice. E3-data selects a data-only rate at $N_d=256$, using $256$ exact training
+samples and $2000$ exact validation samples shared across the five rates;
+these tuning samples are outside the production training-label axis.
+The rows are tuning outcomes, not production-sweep outcomes.}\label{tab:lr-candidates}\\
+\toprule
+Set & Pulse & Config. & Model & $P_{\rm nom}/P_{\rm out}$ & $0.001$ & $0.003$ & $0.01$ & $0.03$ & $0.1$ & Selected \\
+\midrule
+\endfirsthead
+\multicolumn{11}{c}{\tablename\ \thetable\ -- continued}\\
+\toprule
+Set & Pulse & Config. & Model & $P_{\rm nom}/P_{\rm out}$ & $0.001$ & $0.003$ & $0.01$ & $0.03$ & $0.1$ & Selected \\
+\midrule
+\endhead
+\midrule
+\multicolumn{11}{r}{Continued on next page}\\
+\endfoot
+\bottomrule
+\endlastfoot
+E1 & exp & 4q2L & VQC & $44/30$ & $3.4567$ & $2.8118$ & $2.5239$ & $1.7015$ & $1.4192$ & $0.1^{\ast}$ \\
+E1 & exp & 4q2L & MLP & $42/42$ & $2.3559$ & $2.3412$ & $2.4012$ & $0.8587$ & $0.7153$ & $0.1^{\ast}$ \\
+E1 & exp & 4q2L & Spectral & $40/40$ & $2.6825$ & $2.5431$ & $2.6223$ & $1.9345$ & $1.4690$ & $0.1^{\ast}$ \\
+E1 & exp & 6q4L & VQC & $124/88$ & $3.0510$ & $2.2019$ & $1.8525$ & $1.3861$ & $1.1540$ & $0.1^{\ast}$ \\
+E1 & exp & 6q4L & MLP & $114/114$ & $2.4258$ & $2.2101$ & $1.8108$ & $0.9149$ & $0.7805$ & $0.1^{\ast}$ \\
+E1 & exp & 6q4L & Spectral & $116/116$ & $2.6889$ & $2.4889$ & $1.4123$ & $0.7417$ & $0.4041$ & $0.1^{\ast}$ \\
+E1 & exp & -- & MLP-ref & $12802/12802$ & $0.8554$ & $0.4774$ & $0.3556$ & $0.5141$ & $1.9452$ & $0.01$ \\
+E1 & step & 4q2L & VQC & $44/30$ & $3.2276$ & $2.8055$ & $2.6315$ & $2.1116$ & $2.2739$ & $0.03$ \\
+E1 & step & 4q2L & MLP & $42/42$ & $2.3828$ & $2.3558$ & $2.6608$ & $1.2409$ & $0.8261$ & $0.1^{\ast}$ \\
+E1 & step & 4q2L & Spectral & $40/40$ & $2.6899$ & $2.8193$ & $2.7902$ & $2.8500$ & $1.8826$ & $0.1^{\ast}$ \\
+E1 & step & 6q4L & VQC & $124/88$ & $2.9131$ & $2.2049$ & $2.0742$ & $1.0767$ & $1.1929$ & $0.03$ \\
+E1 & step & 6q4L & MLP & $114/114$ & $2.3629$ & $2.2679$ & $1.3758$ & $0.9199$ & $0.9586$ & $0.03$ \\
+E1 & step & 6q4L & Spectral & $116/116$ & $2.6969$ & $2.4670$ & $1.0896$ & $0.7526$ & $1.5595$ & $0.03$ \\
+E1 & step & -- & MLP-ref & $12802/12802$ & $0.7504$ & $0.4474$ & $0.3991$ & $0.4748$ & $2.0660$ & $0.01$ \\
+E1 & smooth & 4q2L & VQC & $44/30$ & $2.4950$ & $1.5693$ & $1.4708$ & $1.3955$ & $1.3109$ & $0.1^{\ast}$ \\
+E1 & smooth & 4q2L & MLP & $42/42$ & $1.2797$ & $1.5327$ & $1.5691$ & $1.5983$ & $1.5815$ & $0.001^{\ast}$ \\
+E1 & smooth & 4q2L & Spectral & $40/40$ & $1.8194$ & $1.5219$ & $1.6730$ & $1.6719$ & $1.4684$ & $0.1^{\ast}$ \\
+E1 & smooth & 6q4L & VQC & $124/88$ & $2.2366$ & $1.3259$ & $1.1432$ & $1.1599$ & $1.2250$ & $0.01$ \\
+E1 & smooth & 6q4L & MLP & $114/114$ & $1.2549$ & $1.3875$ & $1.2753$ & $1.0553$ & $0.9920$ & $0.1^{\ast}$ \\
+E1 & smooth & 6q4L & Spectral & $116/116$ & $1.5004$ & $1.2704$ & $1.0753$ & $1.2484$ & $1.4981$ & $0.01$ \\
+E1 & smooth & -- & MLP-ref & $12802/12802$ & $1.1907$ & $1.1183$ & $0.8192$ & $1.2301$ & $1.7223$ & $0.01$ \\
+\midrule
+E1b & exp & 4q2L & MLP & $29/29$ & $2.4975$ & $2.5621$ & $2.1343$ & $0.9171$ & $0.8229$ & $0.1^{\ast}$ \\
+E1b & exp & 4q2L & Spectral & $40/40$ & $2.6825$ & $2.5431$ & $2.6223$ & $1.9345$ & $1.4690$ & $0.1^{\ast}$ \\
+E1b & exp & 6q4L & MLP & $93/93$ & $2.1514$ & $1.7687$ & $1.2053$ & $0.7193$ & $0.6650$ & $0.1^{\ast}$ \\
+E1b & exp & 6q4L & Spectral & $97/97$ & $2.6419$ & $2.5871$ & $1.2341$ & $1.0738$ & $0.7030$ & $0.1^{\ast}$ \\
+E1b & step & 4q2L & MLP & $29/29$ & $2.4389$ & $2.6325$ & $1.8126$ & $1.0771$ & $1.1280$ & $0.03$ \\
+E1b & step & 4q2L & Spectral & $40/40$ & $2.6899$ & $2.8193$ & $2.7902$ & $2.8500$ & $1.8826$ & $0.1^{\ast}$ \\
+E1b & step & 6q4L & MLP & $93/93$ & $2.1233$ & $1.6029$ & $1.3638$ & $0.9004$ & $0.9082$ & $0.03$ \\
+E1b & step & 6q4L & Spectral & $97/97$ & $2.7202$ & $2.6010$ & $1.6981$ & $1.0486$ & $0.6557$ & $0.1^{\ast}$ \\
+E1b & smooth & 4q2L & MLP & $29/29$ & $1.5330$ & $1.4264$ & $1.3949$ & $1.5888$ & $0.8332$ & $0.1^{\ast}$ \\
+E1b & smooth & 4q2L & Spectral & $40/40$ & $1.8194$ & $1.5219$ & $1.6730$ & $1.6719$ & $1.4684$ & $0.1^{\ast}$ \\
+E1b & smooth & 6q4L & MLP & $93/93$ & $1.2960$ & $1.3951$ & $1.6940$ & $1.6959$ & $0.9500$ & $0.1^{\ast}$ \\
+E1b & smooth & 6q4L & Spectral & $97/97$ & $1.5546$ & $1.3645$ & $1.1268$ & $1.0184$ & $0.9770$ & $0.1^{\ast}$ \\
+\midrule
+E3-data & exp & 6q4L & VQC & $124/88$ & $1.2484$ & $0.8213$ & $0.5597$ & $0.3929$ & $0.4193$ & $0.03$ \\
+E3-data & exp & 6q4L & MLP & $114/114$ & $1.1894$ & $0.9734$ & $0.4870$ & $0.2921$ & $0.1932$ & $0.1^{\ast}$ \\
+\end{longtable}
+\endgroup
+
+Table~\ref{tab:closures} distinguishes realized evaluations from iteration
+caps. The observed ranges are $1019$--$1250$ for E1 and $385$--$1251$
+for E1b (records in Table~\ref{tab:inventory}); a configured evaluation
+limit therefore must not replace recorded line-search closure counts.
+The timer starts after model, reference-data, optimizer, and scheduler
+construction. It includes training, periodic and terminal validation,
+and final test-grid evaluation, ending before serialization and checkpoint
+writing. Shared-machine durations exclude selection and preparation cost.
+
+\begingroup
+\scriptsize
+\setlength{\tabcolsep}{2.5pt}
+\setlength{\LTcapwidth}{\textwidth}
+\begin{longtable}{llllrrrr}
+\caption{Realized L-BFGS closure calls and recorded runtime, mean $\pm$ sample standard deviation over the indicated number of trained seeds. Closure counts are \texttt{hist[-1].lbfgs\_evals}; they count repeated objective evaluations rather than just optimizer iterations. Runtime covers training, validation, and final test-grid evaluation under concurrent shared-machine execution. It is not isolated-device or total-campaign cost.}\label{tab:closures}\\
+\toprule
+Set & Pulse & Config. & Model & $P_{\rm nom}/P_{\rm out}$ & $n$ & Closures & Runtime (s) \\
+\midrule
+\endfirsthead
+\multicolumn{8}{c}{\tablename\ \thetable\ -- continued}\\
+\toprule
+Set & Pulse & Config. & Model & $P_{\rm nom}/P_{\rm out}$ & $n$ & Closures & Runtime (s) \\
+\midrule
+\endhead
+\midrule
+\multicolumn{8}{r}{Continued on next page}\\
+\endfoot
+\bottomrule
+\endlastfoot
+E1 & exp & 4q2L & VQC & $44/30$ & 5 & $1161.0\pm79.8$ & $725.1\pm68.2$ \\
+E1 & exp & 4q2L & MLP & $42/42$ & 5 & $1085.8\pm16.4$ & $15.7\pm1.4$ \\
+E1 & exp & 4q2L & Spectral & $40/40$ & 5 & $1124.0\pm81.8$ & $45.0\pm3.2$ \\
+E1 & exp & 6q4L & VQC & $124/88$ & 5 & $1037.4\pm11.5$ & $4188.9\pm251.0$ \\
+E1 & exp & 6q4L & MLP & $114/114$ & 5 & $1046.4\pm10.5$ & $19.7\pm0.5$ \\
+E1 & exp & 6q4L & Spectral & $116/116$ & 5 & $1045.6\pm10.7$ & $44.1\pm3.7$ \\
+E1 & exp & -- & MLP-ref & $12802/12802$ & 5 & $1062.6\pm5.7$ & $214.6\pm9.4$ \\
+E1 & step & 4q2L & VQC & $44/30$ & 5 & $1082.8\pm21.8$ & $624.5\pm15.5$ \\
+E1 & step & 4q2L & MLP & $42/42$ & 5 & $1073.0\pm10.1$ & $15.0\pm0.1$ \\
+E1 & step & 4q2L & Spectral & $40/40$ & 5 & $1071.2\pm18.1$ & $42.5\pm3.4$ \\
+E1 & step & 6q4L & VQC & $124/88$ & 5 & $1041.4\pm14.1$ & $3644.1\pm21.1$ \\
+E1 & step & 6q4L & MLP & $114/114$ & 5 & $1052.0\pm15.1$ & $21.2\pm2.8$ \\
+E1 & step & 6q4L & Spectral & $116/116$ & 5 & $1049.6\pm13.3$ & $47.3\pm3.4$ \\
+E1 & step & -- & MLP-ref & $12802/12802$ & 5 & $1056.6\pm9.0$ & $212.6\pm7.8$ \\
+E1 & smooth & 4q2L & VQC & $44/30$ & 5 & $1158.2\pm80.8$ & $758.4\pm115.0$ \\
+E1 & smooth & 4q2L & MLP & $42/42$ & 5 & $1090.6\pm8.6$ & $14.6\pm1.0$ \\
+E1 & smooth & 4q2L & Spectral & $40/40$ & 5 & $1118.6\pm80.1$ & $43.1\pm8.7$ \\
+E1 & smooth & 6q4L & VQC & $124/88$ & 5 & $1030.8\pm9.5$ & $4473.7\pm466.5$ \\
+E1 & smooth & 6q4L & MLP & $114/114$ & 5 & $1044.4\pm14.1$ & $19.6\pm2.6$ \\
+E1 & smooth & 6q4L & Spectral & $116/116$ & 5 & $1040.2\pm12.8$ & $43.3\pm4.1$ \\
+E1 & smooth & -- & MLP-ref & $12802/12802$ & 5 & $1057.2\pm10.3$ & $192.8\pm10.6$ \\
+\midrule
+E1b & exp & 4q2L & MLP & $29/29$ & 5 & $1169.6\pm55.4$ & $23.6\pm1.6$ \\
+E1b & exp & 4q2L & Spectral & $40/40$ & 5 & $1124.0\pm81.8$ & $65.5\pm14.7$ \\
+E1b & exp & 6q4L & MLP & $93/93$ & 5 & $1057.6\pm22.6$ & $18.9\pm0.5$ \\
+E1b & exp & 6q4L & Spectral & $97/97$ & 5 & $1065.8\pm15.6$ & $67.5\pm14.1$ \\
+E1b & step & 4q2L & MLP & $29/29$ & 5 & $1131.2\pm35.6$ & $13.0\pm0.5$ \\
+E1b & step & 4q2L & Spectral & $40/40$ & 5 & $1071.2\pm18.1$ & $44.0\pm3.9$ \\
+E1b & step & 6q4L & MLP & $93/93$ & 5 & $1053.6\pm8.0$ & $29.5\pm0.3$ \\
+E1b & step & 6q4L & Spectral & $97/97$ & 5 & $1057.4\pm10.4$ & $47.4\pm8.9$ \\
+E1b & smooth & 4q2L & MLP & $29/29$ & 5 & $982.2\pm334.8$ & $12.3\pm2.3$ \\
+E1b & smooth & 4q2L & Spectral & $40/40$ & 5 & $1118.6\pm80.1$ & $45.2\pm4.0$ \\
+E1b & smooth & 6q4L & MLP & $93/93$ & 5 & $1044.2\pm10.8$ & $18.5\pm0.2$ \\
+E1b & smooth & 6q4L & Spectral & $97/97$ & 5 & $1069.2\pm14.1$ & $49.0\pm5.4$ \\
+\end{longtable}
+\endgroup
+
+\section{Additional field errors and initial-rate ablation}
+
+Table~\ref{tab:extra-errors} retains maximum absolute errors and the
+minimum-stress-error seed in each production cell. Selection of a displayed
+field or E4 checkpoint does not replace all-seed reporting.
+
+\begingroup
+\scriptsize
+\setlength{\tabcolsep}{2.5pt}
+\setlength{\LTcapwidth}{\textwidth}
+\begin{longtable}{llllrrrrr}
+\caption{Additional E1/E1b summaries. Maximum absolute field errors $a_T,a_\sigma$ are mean $\pm$ sample standard deviation across five seeds ($0$--$4$) on the common test grid. LR is the selected initial Adam rate used by all five runs. The last column gives the minimum relative stress error and its seed; these descriptive minima do not replace replicated means. Parameter counts list registered/output-affecting coordinates, not an independent functional dimension.}\label{tab:extra-errors}\\
+\toprule
+Set & Pulse & Config. & Model & $P_{\rm nom}/P_{\rm out}$ & LR & $a_T$ & $a_\sigma$ & Best $e_\sigma$ (seed) \\
+\midrule
+\endfirsthead
+\multicolumn{9}{c}{\tablename\ \thetable\ -- continued}\\
+\toprule
+Set & Pulse & Config. & Model & $P_{\rm nom}/P_{\rm out}$ & LR & $a_T$ & $a_\sigma$ & Best $e_\sigma$ (seed) \\
+\midrule
+\endhead
+\midrule
+\multicolumn{9}{r}{Continued on next page}\\
+\endfoot
+\bottomrule
+\endlastfoot
+E1 & exp & 4q2L & VQC & $44/30$ & $0.1$ & $0.1248\pm0.0356$ & $1.0089\pm0.1748$ & $0.8460$ (0) \\
+E1 & exp & 4q2L & MLP & $42/42$ & $0.1$ & $0.0962\pm0.0501$ & $0.3323\pm0.0509$ & $0.2311$ (1) \\
+E1 & exp & 4q2L & Spectral & $40/40$ & $0.1$ & $0.1534\pm0.0250$ & $0.9340\pm0.2850$ & $0.3669$ (3) \\
+E1 & exp & 6q4L & VQC & $124/88$ & $0.1$ & $0.0559\pm0.0158$ & $0.7466\pm0.0486$ & $0.5698$ (3) \\
+E1 & exp & 6q4L & MLP & $114/114$ & $0.1$ & $0.0305\pm0.0208$ & $0.2265\pm0.0563$ & $0.1055$ (2) \\
+E1 & exp & 6q4L & Spectral & $116/116$ & $0.1$ & $0.0590\pm0.0329$ & $0.5314\pm0.1212$ & $0.3278$ (2) \\
+E1 & exp & -- & MLP-ref & $12802/12802$ & $0.01$ & $0.0029\pm0.0006$ & $0.1407\pm0.0055$ & $0.0461$ (0) \\
+E1 & step & 4q2L & VQC & $44/30$ & $0.03$ & $0.2085\pm0.0726$ & $1.6738\pm0.3548$ & $0.8599$ (1) \\
+E1 & step & 4q2L & MLP & $42/42$ & $0.1$ & $0.1432\pm0.0146$ & $1.0282\pm0.0994$ & $0.4254$ (3) \\
+E1 & step & 4q2L & Spectral & $40/40$ & $0.1$ & $0.2836\pm0.0210$ & $1.5285\pm0.0853$ & $0.8714$ (1) \\
+E1 & step & 6q4L & VQC & $124/88$ & $0.03$ & $0.0815\pm0.0100$ & $1.4995\pm0.3731$ & $0.7391$ (1) \\
+E1 & step & 6q4L & MLP & $114/114$ & $0.03$ & $0.0890\pm0.0221$ & $0.7446\pm0.1917$ & $0.2300$ (0) \\
+E1 & step & 6q4L & Spectral & $116/116$ & $0.03$ & $0.1089\pm0.0179$ & $0.7461\pm0.0803$ & $0.3289$ (2) \\
+E1 & step & -- & MLP-ref & $12802/12802$ & $0.01$ & $0.0120\pm0.0023$ & $0.1935\pm0.0124$ & $0.0439$ (2) \\
+E1 & smooth & 4q2L & VQC & $44/30$ & $0.1$ & $0.1016\pm0.0096$ & $0.8262\pm0.0671$ & $0.8986$ (2) \\
+E1 & smooth & 4q2L & MLP & $42/42$ & $0.001$ & $0.0675\pm0.0217$ & $0.4980\pm0.2913$ & $0.3627$ (1) \\
+E1 & smooth & 4q2L & Spectral & $40/40$ & $0.1$ & $0.1686\pm0.0409$ & $0.8171\pm0.0848$ & $0.7787$ (3) \\
+E1 & smooth & 6q4L & VQC & $124/88$ & $0.01$ & $0.0523\pm0.0070$ & $0.4936\pm0.0518$ & $0.4760$ (4) \\
+E1 & smooth & 6q4L & MLP & $114/114$ & $0.1$ & $0.0162\pm0.0051$ & $0.1613\pm0.0362$ & $0.1172$ (3) \\
+E1 & smooth & 6q4L & Spectral & $116/116$ & $0.01$ & $0.0647\pm0.0155$ & $0.5957\pm0.1561$ & $0.3706$ (1) \\
+E1 & smooth & -- & MLP-ref & $12802/12802$ & $0.01$ & $0.0015\pm0.0004$ & $0.0421\pm0.0090$ & $0.0185$ (3) \\
+\midrule
+E1b & exp & 4q2L & MLP & $29/29$ & $0.1$ & $0.1004\pm0.0155$ & $0.4505\pm0.1842$ & $0.3135$ (0) \\
+E1b & exp & 4q2L & Spectral & $40/40$ & $0.1$ & $0.1534\pm0.0250$ & $0.9340\pm0.2850$ & $0.3669$ (3) \\
+E1b & exp & 6q4L & MLP & $93/93$ & $0.1$ & $0.0385\pm0.0045$ & $0.2561\pm0.0126$ & $0.2196$ (0) \\
+E1b & exp & 6q4L & Spectral & $97/97$ & $0.1$ & $0.0795\pm0.0289$ & $0.4972\pm0.0589$ & $0.6043$ (2) \\
+E1b & step & 4q2L & MLP & $29/29$ & $0.03$ & $0.1973\pm0.0736$ & $1.3764\pm0.4529$ & $0.4344$ (4) \\
+E1b & step & 4q2L & Spectral & $40/40$ & $0.1$ & $0.2836\pm0.0210$ & $1.5285\pm0.0853$ & $0.8714$ (1) \\
+E1b & step & 6q4L & MLP & $93/93$ & $0.03$ & $0.0755\pm0.0209$ & $0.4968\pm0.1402$ & $0.1644$ (3) \\
+E1b & step & 6q4L & Spectral & $97/97$ & $0.1$ & $0.1355\pm0.0224$ & $1.3076\pm0.3046$ & $0.3968$ (1) \\
+E1b & smooth & 4q2L & MLP & $29/29$ & $0.1$ & $0.0802\pm0.0176$ & $0.5411\pm0.0463$ & $0.4676$ (4) \\
+E1b & smooth & 4q2L & Spectral & $40/40$ & $0.1$ & $0.1686\pm0.0409$ & $0.8171\pm0.0848$ & $0.7787$ (3) \\
+E1b & smooth & 6q4L & MLP & $93/93$ & $0.1$ & $0.0323\pm0.0156$ & $0.3721\pm0.2498$ & $0.1427$ (2) \\
+E1b & smooth & 6q4L & Spectral & $97/97$ & $0.1$ & $0.0891\pm0.0229$ & $0.6996\pm0.1722$ & $0.5460$ (3) \\
+\end{longtable}
+\endgroup
+
+Table~\ref{tab:weight-ablation} is the log-derived initial-rate-weight
+ablation. Both rate penalties vary together, and settings differ from E1.
+The main-paper cutoff table also changes both penalties. Neither ablation
+has replicated uncertainty. The cutoff comparison includes the circuit;
+the rate-weight ablation is confined to the classical models in
+Table~\ref{tab:weight-ablation}.
+
+\begin{table}[htbp]
+\centering
+\caption{Initial-rate-weight ablation as reported in the execution log summary: exponential pulse, $\gamma=9$, seed $0$, $N_c=1024$, learning rate $0.003$. Each row is a single run ($n=1$); no standard deviation is available. These log-derived summaries are not additional per-run entries in \texttt{runs\_all.json}.}
+\label{tab:weight-ablation}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lrrrr}
+\toprule
+Model & $P_{\rm nom}/P_{\rm out}$ & Rate weight & $e_T$ & $e_\sigma$ \\
+\midrule
+MLP-ref & $12802/12802$ & $0$ & $0.0155$ & $0.2152$ \\
+MLP-ref & $12802/12802$ & $0.1$ & $0.0169$ & $0.0599$ \\
+MLP-ref & $12802/12802$ & $1$ & $0.0124$ & $0.0492$ \\
+MLP & $114/114$ & $0$ & $0.1322$ & $0.8132$ \\
+MLP & $114/114$ & $0.1$ & $0.0846$ & $0.2688$ \\
+MLP & $114/114$ & $1$ & $0.1867$ & $0.1827$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Complete gradient-variance grid}
+
+Table~\ref{tab:e2full} gives the retained variance estimates for the
+selected first-layer $R_Y$ derivative on qubit zero. Every objective uses
+the same fixed points and matched initialization seeds. Physics includes
+PDE, boundary, and initial-rate terms. The population denominator is
+used for this diagnostic, unlike the sample SD of replicated field errors.
+Individual gradient draws are unavailable; no variance-estimator
+confidence interval or slope-equivalence test is reported.
+
+\begin{table}[htbp]
+\centering
+\caption{E2 reported variance of the derivative with respect to the first-layer $R_Y$ angle on qubit $0$, from $200$ random initializations per cell, using denominator $200$
+(\texttt{ddof=0}) as established from the released code. The last column is the ordinary least-squares slope of $\log_{10}(\mathrm{Var})$ versus qubit count over the displayed range. These are variance estimates, not mean $\pm$ standard deviation summaries; individual gradient draws and uncertainty intervals are not retained
+in the aggregate records.}
+\label{tab:e2full}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{rlrrrrr}
+\toprule
+$L$ & Loss & $n_q=2$ & $3$ & $4$ & $5$ & $6$ \\
+\midrule
+2 & data & $9.56\times10^{-1}$ & $7.54\times10^{-1}$ & $5.05\times10^{-1}$ & $7.07\times10^{-1}$ & $6.00\times10^{-1}$ \\
+2 & physics & $5.89\times10^{0}$ & $9.31\times10^{0}$ & $4.66\times10^{0}$ & $7.47\times10^{0}$ & $1.05\times10^{1}$ \\
+2 & combined & $9.01\times10^{0}$ & $1.25\times10^{1}$ & $6.54\times10^{0}$ & $1.03\times10^{1}$ & $1.36\times10^{1}$ \\
+\midrule
+4 & data & $2.94\times10^{-1}$ & $1.00\times10^{-1}$ & $6.45\times10^{-2}$ & $6.59\times10^{-2}$ & $7.77\times10^{-2}$ \\
+4 & physics & $4.87\times10^{1}$ & $2.79\times10^{1}$ & $9.30\times10^{0}$ & $2.48\times10^{1}$ & $7.30\times10^{0}$ \\
+4 & combined & $5.05\times10^{1}$ & $2.89\times10^{1}$ & $9.68\times10^{0}$ & $2.53\times10^{1}$ & $7.80\times10^{0}$ \\
+\midrule
+8 & data & $1.41\times10^{-1}$ & $3.26\times10^{-2}$ & $1.50\times10^{-2}$ & $5.67\times10^{-3}$ & $3.84\times10^{-3}$ \\
+8 & physics & $3.83\times10^{2}$ & $2.76\times10^{2}$ & $1.25\times10^{2}$ & $5.28\times10^{1}$ & $2.13\times10^{1}$ \\
+8 & combined & $3.85\times10^{2}$ & $2.78\times10^{2}$ & $1.26\times10^{2}$ & $5.30\times10^{1}$ & $2.14\times10^{1}$ \\
+\bottomrule
+\end{tabular}
+\par\medskip
+\begin{tabular}{rlrrrrr}
+\toprule
+$L$ & Loss & $n_q=7$ & $8$ & $9$ & $10$ & Slope \\
+\midrule
+2 & data & $7.83\times10^{-1}$ & $6.61\times10^{-1}$ & $6.21\times10^{-1}$ & $7.22\times10^{-1}$ & $-0.008$ \\
+2 & physics & $8.65\times10^{0}$ & $3.43\times10^{0}$ & $1.10\times10^{1}$ & $1.47\times10^{1}$ & $0.027$ \\
+2 & combined & $1.14\times10^{1}$ & $5.88\times10^{0}$ & $1.37\times10^{1}$ & $1.72\times10^{1}$ & $0.020$ \\
+\midrule
+4 & data & $5.62\times10^{-2}$ & $7.28\times10^{-2}$ & $7.19\times10^{-2}$ & $9.93\times10^{-2}$ & $-0.038$ \\
+4 & physics & $1.65\times10^{1}$ & $1.08\times10^{1}$ & $1.17\times10^{1}$ & $7.04\times10^{0}$ & $-0.076$ \\
+4 & combined & $1.70\times10^{1}$ & $1.15\times10^{1}$ & $1.23\times10^{1}$ & $7.62\times10^{0}$ & $-0.074$ \\
+\midrule
+8 & data & $2.48\times10^{-3}$ & $2.20\times10^{-3}$ & $2.30\times10^{-3}$ & $2.73\times10^{-3}$ & $-0.206$ \\
+8 & physics & $8.72\times10^{0}$ & $1.02\times10^{1}$ & $8.99\times10^{0}$ & $1.06\times10^{1}$ & $-0.227$ \\
+8 & combined & $8.80\times10^{0}$ & $1.03\times10^{1}$ & $9.09\times10^{0}$ & $1.07\times10^{1}$ & $-0.227$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+\begin{table}[htbp]
+\centering
+\caption{Minimum and maximum physics/data ratios of the E2 reported gradient variances across the tested qubit counts. These ratios use the full-precision reported variances and depend on the stated loss normalization.}
+\label{tab:e2ratios}
+\small
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{rrr}
+\toprule
+$L$ & Minimum variance ratio & Maximum variance ratio \\
+\midrule
+2 & $5.19$ & $20.31$ \\
+4 & $70.89$ & $375.41$ \\
+8 & $2726.20$ & $9311.63$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The slopes in the main paper are ordinary least-squares fits to the
+full-precision variances, not the rounded cells above. The additional
+deepest-circuit fit over the largest qubit counts is reported in main
+Table~8. Loss scaling affects variance magnitude quadratically, and no
+asymptotic exponent is identified from these finite scans.
+
+\section{Selected checkpoints and complete noise results}
+
+All tables in this section use $\gamma=9$, the $41\times40$ noise grid,
+and the same selected checkpoint pairs. The exact controls are actual
+$p=0$, \texttt{shots="exact"} evaluations. Stored E1-grid clean metadata
+are not substituted. The full records are grouped by wave speed as well
+as pulse and configuration. A shot count is a per-input, per-observable
+measurement budget; the two readouts are sampled independently in this
+evaluator. Sample SDs describe the two selected checkpoints and do not
+estimate repeated-shot uncertainty.
+
+\begin{table}[htbp]
+\centering
+\caption{Selected E4 checkpoint identities, same-grid clean errors, and affine-readout coefficients. Each row is one trained checkpoint; clean errors use $p=0$ and exact expectations on the E4 grid. Readout indices $0,1$ denote temperature and stress. Gains and offsets are the supplied checkpoint values, rounded to the displayed precision. $P_{\rm nom}/P_{\rm out}$ does not assert an independent functional dimension.}
+\label{tab:e4gainsclean}
+\scriptsize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{llrrrrrrrr}
+\toprule
+Pulse & Config. & $P_{\rm nom}/P_{\rm out}$ & Seed & $e_T$ & $e_\sigma$ & $\alpha_0$ & $\alpha_1$ & $\beta_0$ & $\beta_1$ \\
+\midrule
+exp & 4q2L & $44/30$ & 0 & $0.2624$ & $0.8576$ & $43.90$ & $37.31$ & $0.015$ & $0.046$ \\
+exp & 4q2L & $44/30$ & 3 & $0.3993$ & $1.0458$ & $198.51$ & $207.61$ & $0.000$ & $0.057$ \\
+exp & 6q4L & $124/88$ & 1 & $0.1376$ & $0.5921$ & $3.55$ & $15.60$ & $0.003$ & $-0.207$ \\
+exp & 6q4L & $124/88$ & 3 & $0.1814$ & $0.5686$ & $3.80$ & $12.67$ & $0.027$ & $-0.254$ \\
+\midrule
+step & 4q2L & $44/30$ & 1 & $0.7394$ & $0.8597$ & $50.73$ & $113.36$ & $0.138$ & $-0.184$ \\
+step & 4q2L & $44/30$ & 2 & $0.4912$ & $0.8911$ & $3.96$ & $20.59$ & $0.099$ & $-3.246$ \\
+step & 6q4L & $124/88$ & 0 & $0.2333$ & $0.8246$ & $1.78$ & $5.76$ & $-0.027$ & $-0.444$ \\
+step & 6q4L & $124/88$ & 1 & $0.2189$ & $0.7432$ & $2.20$ & $11.89$ & $0.037$ & $0.854$ \\
+\midrule
+smooth & 4q2L & $44/30$ & 2 & $0.3383$ & $0.8935$ & $-236.17$ & $82.77$ & $-4.051$ & $0.025$ \\
+smooth & 4q2L & $44/30$ & 4 & $0.3115$ & $0.9153$ & $-1.96$ & $0.95$ & $0.050$ & $-0.135$ \\
+smooth & 6q4L & $124/88$ & 1 & $0.1703$ & $0.5325$ & $2.95$ & $6.45$ & $-0.007$ & $0.138$ \\
+smooth & 6q4L & $124/88$ & 4 & $0.1231$ & $0.4730$ & $1.29$ & $6.53$ & $0.003$ & $-0.261$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\FloatBarrier
+\begingroup\footnotesize
+\setlength{\tabcolsep}{4pt}
+\setlength{\LTcapwidth}{\textwidth}
+\begin{longtable}{llrrrr}
+\caption{Corrected E4 inference errors on the common $41\times40$ grid, including the zero-noise exact-expectation controls, finite shots alone, and depolarization with exact expectations. Entries are mean $\pm$ sample standard deviation across the same two selected trained checkpoints per pulse/configuration. Exact denotes expectation evaluation. Each $p=0$, exact row is the clean control for its block; the stored \texttt{clean\_T} and \texttt{clean\_sigma} metadata are not used as these controls.}\label{tab:e4}\\
+\toprule
+Pulse & Config. & $p$ & Shots & $e_T$ & $e_\sigma$ \\
+\midrule
+\endfirsthead
+\multicolumn{6}{c}{\tablename\ \thetable\ -- continued}\\
+\toprule
+Pulse & Config. & $p$ & Shots & $e_T$ & $e_\sigma$ \\
+\midrule
+\endhead
+\midrule
+\multicolumn{6}{r}{Continued on next page}\\
+\endfoot
+\bottomrule
+\endlastfoot
+exp & 4q2L & $0$ & exact & $0.3308\pm0.0968$ & $0.9517\pm0.1331$ \\
+exp & 4q2L & $0$ & $1000$ & $73.8240\pm67.6805$ & $21.3149\pm20.9250$ \\
+exp & 4q2L & $0$ & $10000$ & $22.4574\pm20.3642$ & $6.9947\pm6.7734$ \\
+exp & 4q2L & $0$ & $100000$ & $7.1757\pm6.3994$ & $2.4748\pm1.9383$ \\
+exp & 4q2L & $0.001$ & exact & $0.3290\pm0.0966$ & $0.9500\pm0.1333$ \\
+exp & 4q2L & $0.01$ & exact & $0.3133\pm0.0949$ & $0.9346\pm0.1350$ \\
+\midrule
+exp & 6q4L & $0$ & exact & $0.1595\pm0.0309$ & $0.5804\pm0.0166$ \\
+exp & 6q4L & $0$ & $1000$ & $2.2119\pm0.0068$ & $2.5758\pm0.2728$ \\
+exp & 6q4L & $0$ & $10000$ & $0.7053\pm0.0582$ & $0.9735\pm0.0950$ \\
+exp & 6q4L & $0$ & $100000$ & $0.2691\pm0.0321$ & $0.6299\pm0.0251$ \\
+exp & 6q4L & $0.001$ & exact & $0.1556\pm0.0282$ & $0.5753\pm0.0184$ \\
+exp & 6q4L & $0.01$ & exact & $0.1588\pm0.0336$ & $0.6135\pm0.1210$ \\
+\midrule
+step & 4q2L & $0$ & exact & $0.6153\pm0.1755$ & $0.8754\pm0.0222$ \\
+step & 4q2L & $0$ & $1000$ & $14.8745\pm17.8301$ & $7.5606\pm7.1462$ \\
+step & 4q2L & $0$ & $10000$ & $4.7963\pm5.5767$ & $2.5643\pm2.0159$ \\
+step & 4q2L & $0$ & $100000$ & $1.6668\pm1.5980$ & $1.2036\pm0.3992$ \\
+step & 4q2L & $0.001$ & exact & $0.6134\pm0.1769$ & $0.8710\pm0.0171$ \\
+step & 4q2L & $0.01$ & exact & $0.5974\pm0.1906$ & $0.8566\pm0.0056$ \\
+\midrule
+step & 6q4L & $0$ & exact & $0.2261\pm0.0102$ & $0.7839\pm0.0576$ \\
+step & 6q4L & $0$ & $1000$ & $1.0864\pm0.1215$ & $1.2875\pm0.3769$ \\
+step & 6q4L & $0$ & $10000$ & $0.3964\pm0.0344$ & $0.8455\pm0.0039$ \\
+step & 6q4L & $0$ & $100000$ & $0.2514\pm0.0043$ & $0.7912\pm0.0535$ \\
+step & 6q4L & $0.001$ & exact & $0.2214\pm0.0053$ & $0.7749\pm0.0519$ \\
+step & 6q4L & $0.01$ & exact & $0.2029\pm0.0140$ & $0.7339\pm0.0261$ \\
+\midrule
+smooth & 4q2L & $0$ & exact & $0.3249\pm0.0189$ & $0.9044\pm0.0154$ \\
+smooth & 4q2L & $0$ & $1000$ & $73.0238\pm101.5526$ & $8.6281\pm10.8824$ \\
+smooth & 4q2L & $0$ & $10000$ & $23.3152\pm32.2638$ & $2.9909\pm2.9338$ \\
+smooth & 4q2L & $0$ & $100000$ & $7.5194\pm10.1558$ & $1.3653\pm0.6361$ \\
+smooth & 4q2L & $0.001$ & exact & $0.3898\pm0.1111$ & $0.9046\pm0.0157$ \\
+smooth & 4q2L & $0.01$ & exact & $1.2674\pm1.3552$ & $0.9069\pm0.0185$ \\
+\midrule
+smooth & 6q4L & $0$ & exact & $0.1467\pm0.0334$ & $0.5027\pm0.0420$ \\
+smooth & 6q4L & $0$ & $1000$ & $1.2773\pm0.7026$ & $1.3724\pm0.0278$ \\
+smooth & 6q4L & $0$ & $10000$ & $0.4320\pm0.2159$ & $0.6369\pm0.0212$ \\
+smooth & 6q4L & $0$ & $100000$ & $0.1949\pm0.0692$ & $0.5163\pm0.0425$ \\
+smooth & 6q4L & $0.001$ & exact & $0.1539\pm0.0310$ & $0.5041\pm0.0386$ \\
+smooth & 6q4L & $0.01$ & exact & $0.2357\pm0.0060$ & $0.5319\pm0.0026$ \\
+\end{longtable}
+\endgroup
+
+\FloatBarrier
+\begingroup\footnotesize
+\setlength{\tabcolsep}{4pt}
+\setlength{\LTcapwidth}{\textwidth}
+\begin{longtable}{llrrrr}
+\caption{Corrected E4 joint shot and depolarizing-noise errors on the same evaluation grid and selected checkpoints as Table~\ref{tab:e4}. Entries are mean $\pm$ sample standard deviation across two trained seeds. The dispersion does not estimate uncertainty over repeated independent shot-sampling realizations.}\label{tab:e4joint}\\
+\toprule
+Pulse & Config. & $p$ & Shots & $e_T$ & $e_\sigma$ \\
+\midrule
+\endfirsthead
+\multicolumn{6}{c}{\tablename\ \thetable\ -- continued}\\
+\toprule
+Pulse & Config. & $p$ & Shots & $e_T$ & $e_\sigma$ \\
+\midrule
+\endhead
+\midrule
+\multicolumn{6}{r}{Continued on next page}\\
+\endfoot
+\bottomrule
+\endlastfoot
+exp & 4q2L & $0.001$ & $1000$ & $73.9079\pm68.5329$ & $21.3403\pm20.8135$ \\
+exp & 4q2L & $0.001$ & $10000$ & $22.3959\pm20.3455$ & $7.0580\pm6.8084$ \\
+exp & 4q2L & $0.001$ & $100000$ & $7.2117\pm6.4485$ & $2.4538\pm1.9118$ \\
+exp & 4q2L & $0.01$ & $1000$ & $73.8193\pm68.6636$ & $21.3438\pm20.8092$ \\
+exp & 4q2L & $0.01$ & $10000$ & $22.5016\pm20.4681$ & $6.9110\pm6.7321$ \\
+exp & 4q2L & $0.01$ & $100000$ & $7.1371\pm6.4137$ & $2.4750\pm1.9450$ \\
+\midrule
+exp & 6q4L & $0.001$ & $1000$ & $2.1775\pm0.1358$ & $2.6298\pm0.3841$ \\
+exp & 6q4L & $0.001$ & $10000$ & $0.7064\pm0.0501$ & $0.9714\pm0.0901$ \\
+exp & 6q4L & $0.001$ & $100000$ & $0.2721\pm0.0251$ & $0.6185\pm0.0168$ \\
+exp & 6q4L & $0.01$ & $1000$ & $2.2078\pm0.0967$ & $2.5795\pm0.3999$ \\
+exp & 6q4L & $0.01$ & $10000$ & $0.7039\pm0.0430$ & $0.9982\pm0.1689$ \\
+exp & 6q4L & $0.01$ & $100000$ & $0.2697\pm0.0008$ & $0.6630\pm0.1217$ \\
+\midrule
+step & 4q2L & $0.001$ & $1000$ & $14.8401\pm17.8334$ & $7.5581\pm7.1904$ \\
+step & 4q2L & $0.001$ & $10000$ & $4.7419\pm5.4846$ & $2.5953\pm2.0907$ \\
+step & 4q2L & $0.001$ & $100000$ & $1.6123\pm1.5334$ & $1.2206\pm0.4446$ \\
+step & 4q2L & $0.01$ & $1000$ & $14.7380\pm17.7327$ & $7.5403\pm7.1826$ \\
+step & 4q2L & $0.01$ & $10000$ & $4.7569\pm5.5249$ & $2.5909\pm2.0626$ \\
+step & 4q2L & $0.01$ & $100000$ & $1.6660\pm1.6301$ & $1.1910\pm0.4320$ \\
+\midrule
+step & 6q4L & $0.001$ & $1000$ & $1.0987\pm0.1280$ & $1.2799\pm0.3607$ \\
+step & 6q4L & $0.001$ & $10000$ & $0.3963\pm0.0399$ & $0.8458\pm0.0211$ \\
+step & 6q4L & $0.001$ & $100000$ & $0.2488\pm0.0017$ & $0.7817\pm0.0465$ \\
+step & 6q4L & $0.01$ & $1000$ & $1.0939\pm0.2022$ & $1.2507\pm0.3792$ \\
+step & 6q4L & $0.01$ & $10000$ & $0.3936\pm0.0455$ & $0.8039\pm0.0761$ \\
+step & 6q4L & $0.01$ & $100000$ & $0.2300\pm0.0181$ & $0.7407\pm0.0318$ \\
+\midrule
+smooth & 4q2L & $0.001$ & $1000$ & $73.0445\pm101.5041$ & $8.6282\pm10.8859$ \\
+smooth & 4q2L & $0.001$ & $10000$ & $23.9366\pm33.1582$ & $3.0050\pm2.9535$ \\
+smooth & 4q2L & $0.001$ & $100000$ & $7.3960\pm9.9820$ & $1.3765\pm0.6522$ \\
+smooth & 4q2L & $0.01$ & $1000$ & $74.1424\pm103.1490$ & $8.4736\pm10.6587$ \\
+smooth & 4q2L & $0.01$ & $10000$ & $23.3594\pm32.3435$ & $3.0202\pm2.9673$ \\
+smooth & 4q2L & $0.01$ & $100000$ & $7.4067\pm9.9998$ & $1.4025\pm0.6822$ \\
+\midrule
+smooth & 6q4L & $0.001$ & $1000$ & $1.2904\pm0.7148$ & $1.3423\pm0.0080$ \\
+smooth & 6q4L & $0.001$ & $10000$ & $0.4415\pm0.2206$ & $0.6299\pm0.0275$ \\
+smooth & 6q4L & $0.001$ & $100000$ & $0.2015\pm0.0657$ & $0.5175\pm0.0384$ \\
+smooth & 6q4L & $0.01$ & $1000$ & $1.3081\pm0.7323$ & $1.3870\pm0.0219$ \\
+smooth & 6q4L & $0.01$ & $10000$ & $0.4791\pm0.1837$ & $0.6600\pm0.0052$ \\
+smooth & 6q4L & $0.01$ & $100000$ & $0.2708\pm0.0312$ & $0.5473\pm0.0029$ \\
+\end{longtable}
+\endgroup
+
+\section{Corrected-solution verification}
+
+The main appendix gives the corrected reference formulas. The scripts
+\path{closed_form_corrected.py}, \path{laplace_ref.py}, \path{fd_ref.py},
+and \path{check_corrected.py} supply algebraically independent inverse
+evaluation and a separately discretized evolution calculation. The
+pointwise log is \path{verification_log_closed_form.txt}. Tables below
+report what was executed; they do not imply a new experiment or a uniform
+error bound. Numerical inversion uses the de Hoog method
+\citep{deHoog1982}.
+
+\subsection{Reference-solution corrections and executed verification}
+\label{supp:reference-verification}
+
+Table~\ref{tab:supp-corrections} records the correction inventory supplied
+by the author for \citet{AlQahtani2026}. The corrected expressions are
+given in the main-text exact-solution appendix; the inventory is not a new
+inspection of the original published typesetting. Tables
+\ref{tab:supp-verification-settings} and \ref{tab:supp-verification-results}
+summarize the executed driver and its retained log. The complete pointwise
+output is supplied as \path{verification_log_closed_form.txt}.
+
+\begin{table}[htbp]
+\centering
+\caption{Correction inventory from the supplied author audit. Equation and
+figure identifiers in the first column belong to \citet{AlQahtani2026}.
+The energy values describe that paper's caption; they are not the pulse
+energies used for the present benchmark.}
+\label{tab:supp-corrections}
+\begin{tabular}{@{}p{0.19\linewidth}p{0.76\linewidth}@{}}
+\toprule
+Original location & Correction or convention used here\\
+\midrule
+Equation (11) & Use the complementary-error-function argument
+$(2t-x)/(2\sqrt t)$ in the identified term; the reported opposite sign
+violates the zero initial-temperature condition.\\
+Equation (12) & Replace the reported unit-step response, whose initial
+limit is $e^{-x}$, by the corrected unit-step response $\mathcal T_0$.\\
+Equations (19)--(26) & Replace the reported stress expressions containing
+uncanceled growing contributions by the corrected stress response in the
+main-text exact-solution appendix.\\
+Equation (15) & With the original stress scale $\Sigma_0=b_{\rm th}I_1/(k\delta)$,
+the original dimensionless stress $s$ satisfies
+$s_{xx}-s_{tt}/\gamma=T_{tt}/\gamma$.
+The present convention $\sigma=\gamma s$ gives unit forcing coefficient.\\
+Figure 2 caption & The reported products are $A_s\Delta=0.25$ and
+$A_e/\beta=0.5$, so the two reported energies are unequal.\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\caption{Executed reference-check settings, recovered from
+\texttt{check\_corrected.py}, \texttt{laplace\_ref.py}, \texttt{fd\_ref.py}, and the
+verification log. All space--time quantities are dimensionless.
+The inverse transform is evaluated with the stated arithmetic precision
+and converted to double precision before comparison.}
+\label{tab:supp-verification-settings}
+\begin{tabular}{@{}p{0.24\linewidth}p{0.71\linewidth}@{}}
+\toprule
+Check or setting & Recorded specification\\
+\midrule
+Exponential and rectangular checks &
+$\gamma=9$; exponential $\beta=2$, $A_e=1$;
+rectangular $A_s=1$, $\Delta=0.5$.\\
+Sampling for those checks &
+$x\in\{0.1,0.5,1.1,2.1,4.1\}$ and
+$t\in\{0.1,0.3,0.75,1.5,2.5\}$; Cartesian product,
+$25$ locations per pulse.\\
+Smooth inversion check &
+$\gamma=9$, $A=4/3$, $\beta_1=2$, $\beta_2=8$;
+$(x,t)\in\{(0.1,0.1),(1.1,0.75),(2.1,1.5),(0.5,2.5),(4.1,2.5)\}$;
+$5$ locations.\\
+Inverse-transform procedure &
+de Hoog method, $30$-decimal-digit arithmetic;
+exponential/rectangular values printed with $7$ significant digits;
+smooth values with $8$. The smooth field transforms use the pulse transform $\widehat f(s)=$
+$(4/3)[(s+2)^{-1}-(s+8)^{-1}]$.\\
+Finite-difference discretization &
+$x\in[0,24]$, $2400$ spatial intervals, $\Delta x=0.01$;
+centered interior differences and classical fourth-order Runge--Kutta;
+$\Delta t\simeq0.2(\Delta x)^2=2\times10^{-5}$;
+final time $2.5$.\\
+Finite-difference fields and data &
+Evolve $T,w,w_t$ with $w=\sigma+\gamma T$;
+$T(x,0)=w(x,0)=w_t(x,0)=0$;
+$T_x(0,t)=0$, $w(0,t)=\gamma T(0,t)$;
+$T(24,t)=w(24,t)=0$.\\
+Large-$\gamma$ finite-value check &
+Exponential pulse, $\beta=2$, $\gamma=100$;
+$x\in\{0,0.1,1,5,20\}$ and
+$t\in\{0.05,0.5,2,5\}$; Cartesian product,
+$20$ stress evaluations, without an independent reference.\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\caption{Results retained in the verification log. Finite-difference
+maxima are over the sampled locations in
+Table~\ref{tab:supp-verification-settings}, not the full discretization
+grid. The smooth maximum is the maximum absolute discrepancy across
+both fields and all its sampled locations. These are deterministic
+reference checks and are not training errors.}
+\label{tab:supp-verification-results}
+\begin{tabular}{@{}p{0.25\linewidth}p{0.33\linewidth}p{0.34\linewidth}@{}}
+\toprule
+Method/case & Temperature result & Stress result\\
+\midrule
+de Hoog, exponential & Equal at $7$ printed significant digits at all
+$25$ locations & Equal at $7$ printed significant digits at all
+$25$ locations\\
+de Hoog, rectangular & Equal at $7$ printed significant digits at all
+$25$ locations & Equal at $7$ printed significant digits at all
+$25$ locations\\
+Finite differences, exponential &
+Maximum absolute discrepancy $4.20\times10^{-6}$ &
+Maximum absolute discrepancy $6.18\times10^{-3}$\\
+Finite differences, rectangular &
+Maximum absolute discrepancy $5.91\times10^{-6}$ &
+Maximum absolute discrepancy $6.19\times10^{-3}$\\
+de Hoog, smooth & \multicolumn{2}{p{0.69\linewidth}}{
+Maximum absolute discrepancy $5.13\times10^{-16}$ over both fields
+at the $5$ locations; no smooth finite-difference comparison is logged.}\\
+Large-$\gamma$ check & Not evaluated in this check &
+All $20$ reported stress values are finite; no accuracy bound is established.\\
+Module regression self-test & \multicolumn{2}{p{0.69\linewidth}}{
+\texttt{SELF-TEST PASSED}; maximum absolute discrepancy
+$4.0\times10^{-10}$ over $5$ stored reference points, below the
+$10^{-9}$ threshold. Both fields are finite for all pulses on the
+$241\times240$ grid. Stored constants are rounded inversion references.}\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The supplied finite-difference check evolves
+$w_{tt}=\gamma(w-\gamma T)_{xx}$ and recovers
+$\sigma=w-\gamma T$. The checks in
+Table~\ref{tab:supp-verification-results} support agreement at the sampled
+points, but do not provide a uniform error bound or a mesh-convergence
+study. No unrounded maximum inversion discrepancy is retained for the
+exponential or rectangular pulse. The large-$\gamma$ block checks
+finiteness only and does not replace the secondary-wave-speed network
+experiments.
+
+The appended \path{ground_truth.py} self-test was executed in the
+declared Python~3.12.5, NumPy~2.5.1, and SciPy~1.16.3 environment.
+At its five stored point references, the largest deviation among
+exponential/rectangular temperatures and stresses is $4.0\times10^{-10}$,
+below its $10^{-9}$ pass threshold (Table~\ref{tab:supp-verification-results}).
+These references are stored as rounded constants derived from the
+inverse-Laplace calculation; this replay is a regression check of the
+module, not an additional independent reference method. It also verifies
+finite values of both fields for all pulses on the $241\times240$ grid.
+The execution stdout is retained in the archive verification log.
+
+\section{Run commands and reconstruction}
+\label{supp:reconstruction}
+
+The entry points below are provided in the analysis directory of
+\path{QPINN_LTE_release_v1_2026-10-21.zip}. The archive contains their
+results, checkpoint state dictionaries, execution logs, and the package
+listed in Section~S1. Its \path{RELEASE_README} supplies the table/figure
+to input/data/generator mapping and regeneration commands; the analysis
+version used here is described by \path{results_package_v6.md}.
+These commands document the executed workflow and are run from
+the assembled analysis directory with its dependencies. The launchers
+retain the thread settings in Table~S3.
+
+\begin{verbatim}
+python3 check_corrected.py
+python3 ground_truth.py
+python3 functional_count.py
+OMP_NUM_THREADS=2 python3 family_equivalence.py
+mkdir -p logs/lrsel logs/e1
+zsh run_lrsel.sh
+zsh run_lrsel_hi.sh
+python3 select_lrs.py
+zsh run_e1.sh
+zsh run_functional_matched.sh
+zsh run_ablation_xmin.sh mlpref
+zsh run_ablation_xmin.sh circuit
+python3 qpinn_local.py e2 --case exp --gamma 9
+OMP_NUM_THREADS=4 python3 run_e4.py
+zsh run_gamma.sh
+unset SKIP_PENDING
+python3 make_results_package.py
+python3 make_runs_all.py
+\end{verbatim}
+
+\path{family_equivalence_check.txt} contains the executed output of
+\path{family_equivalence.py}, discussed in Section~S2. The script compares
+the two raw circuit outputs after active-qubit parameter transplantation;
+it does not train any model. The code and retained output accompany the
+coordinate audit and reference-solution verification records.
+
+The E3 source launcher \path{run_e3.sh} performs its data-only rate
+selection and generates the planned job list in \path{logs/e3/jobs.txt}.
+The historical main and replacement auxiliary entry points were
+\texttt{zsh run\_e3.sh} and \texttt{zsh run\_e3\_aux.sh}, respectively.
+Its unmodified list still contains the dropped high-collocation circuit
+jobs (Table~\ref{tab:settings}); a fresh execution would therefore launch
+the full plan. To replay the retained experiment, omit those two job lines
+before dispatch or reconstruct the retained jobs from the per-run settings
+in Table~\ref{tab:e3-seeds}. The auxiliary \path{run_e3_aux.sh} v2 orders
+remaining jobs by its cost heuristic, reads its adjustable worker count
+from \path{logs/e3/aux_workers}, and skips any job whose log already exists.
+Its process pattern counts E3 processes, not only circuits despite that
+wording in a comment. An existing log or final queue marker is not a
+completion certificate; retained cells were checked against their JSON
+records and declared seeds (Table~\ref{tab:inventory}).
+
+The reference reproducibility check used the following settings; the
+command generates the separately retained replay record rather than
+replacing its cutoff-ablation counterpart (main Table~4).
+\begin{verbatim}
+OMP_NUM_THREADS=3 python3 qpinn_local.py run --model mlpref \
+  --case exp --gamma 9 --n_q 6 --L 4 --seed 0 \
+  --iters 2000 --lbfgs 1000 --n_c 512 --lr 0.01 \
+  --ic_xmin 0.3 --tag xmin0.3_omp3 --out results/ablation_repro
+\end{verbatim}
+
+To reconstruct summaries, group production rows by experiment, pulse,
+wave speed, model, architecture, regime, and swept setting. Preserve the
+declared seeds. Use arithmetic means and sample SDs for E1/E1b and
+secondary speeds, means and both seed values or ranges for E3, and
+individual values for ablations. Metrics are \texttt{relL2\_T},
+\texttt{relL2\_sigma}, \texttt{maxabs\_T}, \texttt{maxabs\_sigma}, and
+\texttt{train\_s}; realized L-BFGS closures are
+\texttt{hist[-1].lbfgs\_evals} when present. Data-only runs have no L-BFGS
+stage. Best seeds minimize \texttt{relL2\_sigma}. Selection groups use
+minimum final \texttt{val}; E2 fits use unrounded \texttt{var} values.
+E4 groups additionally include \texttt{p} and \texttt{shots}, retaining
+clean exact rows. The reported E4 set is restricted to $\gamma=9$
+(Table~\ref{tab:inventory}); rerunning \path{run_e4.py} after secondary
+checkpoints exist can evaluate additional speeds, whose records must be
+kept separate. Candidate runs and superseded outputs remain separate
+from production summaries. A parser's unused default \texttt{n\_c} in a
+data-only record is not actual collocation. The generators tolerate partial
+groups, so the inventory and explicit per-seed audit, rather than
+generator success alone, establish completion.
+
+\section{Efficiency and secondary-speed per-run records}
+
+\subsection{E3: all executed runs}
+
+Table~\ref{tab:e3-seeds} contains all $66$ E3 records once. Design codes
+$P_{q,L}$ denote parameter sweeps: $N_c=512$, $4N_c=2048$, and rate $0.1$.
+Codes $C_j$ denote the $(6,4)$ collocation design with $N_c=j$,
+$4N_c=4j$, and rate $0.1$. Codes $D_j$ denote the $(6,4)$ data design
+with $N_d=j$ production training labels, no collocation or L-BFGS, and
+rates $0.03$ (VQC) and $0.1$ (MLP). These rates were selected separately
+using $256$ exact training samples and $2000$ exact validation samples
+shared across five candidate rates (Section~S3); those samples are not
+included in $N_d$. Production validation is diagnostic and neither
+updates parameters nor selects checkpoints. All use $2000$ Adam steps.
+The collocation baseline $C_{512}$ is
+$P_{6,4}$, not another run. Parameter counts and both matching deviations
+are given in Table~\ref{tab:extended-counts}; all $C_j,D_j$ rows use its
+$(6,4)$ counts. ``Index'' is the zero-based record index in the released
+\texttt{runs\_all.json}. It identifies each full record and its stored
+\texttt{name} and \texttt{file}. The $84$-target classical executions
+have identical errors and histories but distinct measured times;
+all executions are shown for provenance and are not independent designs.
+Times are contention-affected observed durations, unsuitable for
+isolated-throughput comparisons; overlapping queues affect these
+wall-clock observations.
+
+\begingroup\scriptsize
+\setlength{\tabcolsep}{3pt}
+\begin{longtable}{rllrrrrr}
+\caption{E3 per-seed outcomes, timing, and actual L-BFGS closure counts.
+A zero closure count denotes the data-only regime. No sample standard
+deviations are assigned to the two-seed cells. Timings are
+contention-affected observed durations, unsuitable for isolated-throughput
+comparisons. Data-design $N_d$ counts production training labels,
+conditional on the separate tuning overhead specified in Section~S3.}
+\label{tab:e3-seeds}\\
+\toprule
+Index & Design & Model & Seed & $e_T$ & $e_\sigma$ & Time (s) & Closures \\
+\midrule\endfirsthead
+\toprule
+Index & Design & Model & Seed & $e_T$ & $e_\sigma$ & Time (s) & Closures \\
+\midrule\endhead
+\midrule\multicolumn{8}{r}{Continued on next page}\\\endfoot
+\bottomrule\endlastfoot
+223 & $P_{4,2}$ & VQC & 0 & 0.2561 & 0.8460 & 943.07 & 1250 \\
+224 & $P_{4,2}$ & VQC & 1 & 0.5500 & 1.1794 & 730.79 & 1159 \\
+195 & $P_{4,2}$ & MLP & 0 & 0.2723 & 0.3823 & 13.06 & 1066 \\
+196 & $P_{4,2}$ & MLP & 1 & 0.2788 & 0.2311 & 13.33 & 1079 \\
+175 & $P_{4,2}$ & Spectral & 0 & 0.4112 & 0.9487 & 33.71 & 1244 \\
+176 & $P_{4,2}$ & Spectral & 1 & 0.4001 & 0.7746 & 31.57 & 1172 \\
+225 & $P_{4,4}$ & VQC & 0 & 0.1905 & 1.0473 & 1437.31 & 1039 \\
+226 & $P_{4,4}$ & VQC & 1 & 0.1990 & 0.9030 & 1328.29 & 1019 \\
+197 & $P_{4,4}$ & MLP & 0 & 0.1100 & 0.2196 & 16.49 & 1046 \\
+198 & $P_{4,4}$ & MLP & 1 & 0.1005 & 0.2610 & 16.57 & 1044 \\
+177 & $P_{4,4}$ & Spectral & 0 & 0.3864 & 0.6899 & 32.07 & 1057 \\
+178 & $P_{4,4}$ & Spectral & 1 & 0.1796 & 0.4204 & 29.97 & 1037 \\
+227 & $P_{6,2}$ & VQC & 0 & 0.6498 & 1.3497 & 2352.39 & 1099 \\
+228 & $P_{6,2}$ & VQC & 1 & 0.6162 & 1.5413 & 3342.69 & 1250 \\
+199 & $P_{6,2}$ & MLP & 0 & 0.1020 & 0.2854 & 15.14 & 1057 \\
+200 & $P_{6,2}$ & MLP & 1 & 0.2040 & 0.4341 & 14.01 & 1055 \\
+179 & $P_{6,2}$ & Spectral & 0 & 0.4830 & 0.8510 & 31.42 & 1064 \\
+180 & $P_{6,2}$ & Spectral & 1 & 0.2988 & 0.8815 & 27.88 & 1074 \\
+232 & $P_{6,4}$ & VQC & 0 & 0.1939 & 0.8785 & 3752.97 & 1037 \\
+236 & $P_{6,4}$ & VQC & 1 & 0.1376 & 0.5919 & 5044.49 & 1030 \\
+205 & $P_{6,4}$ & MLP & 0 & 0.1959 & 0.3409 & 15.61 & 1031 \\
+210 & $P_{6,4}$ & MLP & 1 & 0.0844 & 0.3872 & 15.28 & 1045 \\
+181 & $P_{6,4}$ & Spectral & 0 & 0.1650 & 0.7594 & 33.29 & 1046 \\
+182 & $P_{6,4}$ & Spectral & 1 & 0.2667 & 0.8056 & 27.02 & 1035 \\
+237 & $P_{6,8}$ & VQC & 0 & 0.0606 & 0.3951 & 8682.91 & 1028 \\
+238 & $P_{6,8}$ & VQC & 1 & 0.0591 & 0.4977 & 11551.89 & 1035 \\
+211 & $P_{6,8}$ & MLP & 0 & 0.0359 & 0.0935 & 22.42 & 1038 \\
+212 & $P_{6,8}$ & MLP & 1 & 0.0756 & 0.1455 & 19.10 & 1027 \\
+183 & $P_{6,8}$ & Spectral & 0 & 0.1327 & 0.3583 & 34.25 & 1048 \\
+184 & $P_{6,8}$ & Spectral & 1 & 0.1513 & 0.4064 & 30.21 & 1059 \\
+239 & $P_{8,2}$ & VQC & 0 & 0.6694 & 1.7132 & 8575.21 & 1097 \\
+240 & $P_{8,2}$ & VQC & 1 & 1.0819 & 2.3649 & 11564.26 & 1089 \\
+213 & $P_{8,2}$ & MLP & 0 & 0.1100 & 0.2196 & 16.58 & 1046 \\
+214 & $P_{8,2}$ & MLP & 1 & 0.1005 & 0.2610 & 14.70 & 1044 \\
+185 & $P_{8,2}$ & Spectral & 0 & 0.3864 & 0.6899 & 29.84 & 1057 \\
+186 & $P_{8,2}$ & Spectral & 1 & 0.1796 & 0.4204 & 25.73 & 1037 \\
+231 & $C_{64}$ & VQC & 0 & 0.1051 & 0.8078 & 1148.63 & 1032 \\
+235 & $C_{64}$ & VQC & 1 & 0.3348 & 0.8318 & 1215.85 & 1037 \\
+204 & $C_{64}$ & MLP & 0 & 0.0870 & 0.2023 & 9.31 & 1027 \\
+209 & $C_{64}$ & MLP & 1 & 0.1705 & 0.2060 & 8.90 & 1042 \\
+230 & $C_{256}$ & VQC & 0 & 0.2140 & 0.5376 & 2905.75 & 1021 \\
+234 & $C_{256}$ & VQC & 1 & 0.2176 & 0.7998 & 3397.30 & 1069 \\
+202 & $C_{256}$ & MLP & 0 & 0.0906 & 0.2438 & 11.66 & 1037 \\
+207 & $C_{256}$ & MLP & 1 & 0.1491 & 0.2713 & 11.04 & 1034 \\
+229 & $C_{1024}$ & VQC & 0 & 0.1815 & 0.8250 & 10380.71 & 1040 \\
+233 & $C_{1024}$ & VQC & 1 & 0.2463 & 0.6938 & 9245.77 & 1050 \\
+201 & $C_{1024}$ & MLP & 0 & 0.0770 & 0.0886 & 21.79 & 1056 \\
+206 & $C_{1024}$ & MLP & 1 & 0.1154 & 0.2566 & 19.22 & 1043 \\
+203 & $C_{4096}$ & MLP & 0 & 0.1118 & 0.3441 & 73.53 & 1055 \\
+208 & $C_{4096}$ & MLP & 1 & 0.1213 & 0.2496 & 56.15 & 1032 \\
+216 & $D_{16}$ & VQC & 0 & 0.9935 & 2.5130 & 28.95 & 0 \\
+220 & $D_{16}$ & VQC & 1 & 2.2859 & 1.7633 & 27.89 & 0 \\
+188 & $D_{16}$ & MLP & 0 & 0.7236 & 1.7778 & 0.66 & 0 \\
+192 & $D_{16}$ & MLP & 1 & 1.4504 & 1.2370 & 0.57 & 0 \\
+218 & $D_{64}$ & VQC & 0 & 0.2571 & 0.6260 & 32.40 & 0 \\
+222 & $D_{64}$ & VQC & 1 & 0.3024 & 0.4412 & 31.38 & 0 \\
+190 & $D_{64}$ & MLP & 0 & 0.0865 & 0.2229 & 0.70 & 0 \\
+194 & $D_{64}$ & MLP & 1 & 0.0738 & 0.1577 & 0.63 & 0 \\
+217 & $D_{256}$ & VQC & 0 & 0.1873 & 0.2953 & 49.46 & 0 \\
+221 & $D_{256}$ & VQC & 1 & 0.1940 & 0.2882 & 46.74 & 0 \\
+189 & $D_{256}$ & MLP & 0 & 0.0873 & 0.0773 & 0.77 & 0 \\
+193 & $D_{256}$ & MLP & 1 & 0.1140 & 0.0995 & 0.64 & 0 \\
+215 & $D_{1024}$ & VQC & 0 & 0.1769 & 0.2211 & 156.30 & 0 \\
+219 & $D_{1024}$ & VQC & 1 & 0.2070 & 0.2146 & 141.83 & 0 \\
+187 & $D_{1024}$ & MLP & 0 & 0.0870 & 0.0885 & 1.19 & 0 \\
+191 & $D_{1024}$ & MLP & 1 & 0.0682 & 0.0858 & 0.93 & 0 \\
+\end{longtable}
+\endgroup
+
+\subsection{Secondary wave speeds: all executed runs}
+
+The $24$ secondary-speed records use the exponential pulse, seeds
+$0,1,2$, $N_c=512$, $2048$ fixed L-BFGS points, $2000$ Adam steps, and
+a cap of $1000$ L-BFGS iterations. Counts and deviations are the
+$(6,4)$ entries in Table~\ref{tab:extended-counts}; the unmatched
+reference has $12802$ parameters. Rates are $0.1$, except $0.01$ for
+the reference. The main secondary-wave-speed table summarizes the errors
+with sample standard deviations; the $\gamma=9$ baseline there uses
+only E1 seeds $0,1,2$. Table~\ref{tab:gamma-seeds} gives the new records
+without conflating their measured times with an isolated resource cost.
+
+\begingroup\scriptsize
+\setlength{\tabcolsep}{3pt}
+\begin{longtable}{rrlrrrrr}
+\caption{Secondary-wave-speed per-seed results. Index refers to the
+zero-based position in \texttt{runs\_all.json}. Closures are actual
+objective/gradient evaluations, not optimizer iterations.}
+\label{tab:gamma-seeds}\\
+\toprule
+Index & $\gamma$ & Model & Seed & $e_T$ & $e_\sigma$ & Time (s) & Closures \\
+\midrule\endfirsthead
+\toprule
+Index & $\gamma$ & Model & Seed & $e_T$ & $e_\sigma$ & Time (s) & Closures \\
+\midrule\endhead
+\midrule\multicolumn{8}{r}{Continued on next page}\\\endfoot
+\bottomrule\endlastfoot
+259 & 25 & VQC & 0 & 0.3175 & 1.7249 & 4093.61 & 1029 \\
+260 & 25 & VQC & 1 & 0.2399 & 0.8438 & 4111.89 & 1036 \\
+261 & 25 & VQC & 2 & 0.3208 & 1.0225 & 4142.69 & 1038 \\
+247 & 25 & MLP & 0 & 0.1595 & 0.2019 & 21.92 & 1052 \\
+248 & 25 & MLP & 1 & 0.0674 & 0.1023 & 20.29 & 1031 \\
+249 & 25 & MLP & 2 & 0.1569 & 0.4017 & 20.30 & 1064 \\
+241 & 25 & Spectral & 0 & 0.3349 & 0.5232 & 61.63 & 1042 \\
+242 & 25 & Spectral & 1 & 0.2136 & 1.0056 & 52.32 & 1037 \\
+243 & 25 & Spectral & 2 & 0.4054 & 0.3738 & 55.55 & 1050 \\
+253 & 25 & Reference & 0 & 0.0221 & 0.1237 & 239.86 & 1074 \\
+254 & 25 & Reference & 1 & 0.0193 & 0.0632 & 239.85 & 1059 \\
+255 & 25 & Reference & 2 & 0.0250 & 0.1264 & 238.74 & 1059 \\
+262 & 49 & VQC & 0 & 0.3257 & 2.3413 & 4112.72 & 1028 \\
+263 & 49 & VQC & 1 & 0.5982 & 1.2869 & 6171.44 & 1044 \\
+264 & 49 & VQC & 2 & 0.2366 & 0.7172 & 6078.08 & 1037 \\
+250 & 49 & MLP & 0 & 0.1962 & 0.3184 & 19.53 & 1036 \\
+251 & 49 & MLP & 1 & 0.2281 & 0.5806 & 18.53 & 1034 \\
+252 & 49 & MLP & 2 & 0.3161 & 0.4543 & 18.16 & 1065 \\
+244 & 49 & Spectral & 0 & 0.6394 & 0.9249 & 55.14 & 1062 \\
+245 & 49 & Spectral & 1 & 0.2615 & 0.5832 & 42.71 & 1055 \\
+246 & 49 & Spectral & 2 & 0.4190 & 0.5600 & 44.30 & 1062 \\
+256 & 49 & Reference & 0 & 0.0436 & 0.1029 & 228.53 & 1056 \\
+257 & 49 & Reference & 1 & 0.0417 & 0.1117 & 208.67 & 1047 \\
+258 & 49 & Reference & 2 & 0.0408 & 0.0721 & 204.36 & 1056 \\
+\end{longtable}
+\endgroup
+
+\FloatBarrier
+\bibliographystyle{plainnat}
+\bibliography{refs}
+\end{document}
